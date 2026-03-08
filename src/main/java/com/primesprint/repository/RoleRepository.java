@@ -1,4 +1,4 @@
 package com.primesprint.repository;
 
-public class RoleRepository {
+public interface RoleRepository {
 }
