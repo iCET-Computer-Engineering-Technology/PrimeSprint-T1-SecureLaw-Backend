@@ -15,3 +15,16 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      cors:
+        allowed-origins: http://localhost:4200,https://securelaw.vercel.app,https://preview-securelaw.vercel.app
+        allowed-methods: GET,OPTIONS
+        allow-credentials: true
+  endpoint:
+    health:
+      show-details: never
