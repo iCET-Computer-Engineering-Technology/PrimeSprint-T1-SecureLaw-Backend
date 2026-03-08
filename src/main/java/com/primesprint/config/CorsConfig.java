@@ -18,7 +18,8 @@ public class CorsConfig {
                         .allowedOrigins(
                                 "http://localhost:4200",
                                 "https://securelaw.vercel.app",
-                                "https://preview-securelaw.vercel.app"
+                                "https://preview-securelaw.vercel.app",
+                                "https://prime-sprint-t1-secure-la-git-22a7c7-theekshana-nuwans-projects.vercel.app"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
