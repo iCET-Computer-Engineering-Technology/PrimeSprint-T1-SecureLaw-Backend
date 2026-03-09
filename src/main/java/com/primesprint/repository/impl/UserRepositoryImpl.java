@@ -59,16 +59,11 @@ public class UserRepositoryImpl implements UserRepository {
                          UUID roleId) {
 
         String sql = """
-            INSERT INTO users (username,email,password,role_id)VALUES (?,?,?,(SELECT id FROM roles WHERE name = ?))
-    """;
+            INSERT INTO users (id, username, email, password, role_id, status)
+            VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+            """;
 
-        jdbcTemplate.update(
-                sql,
-                username,
-                email,
-                password,
-                roleId
-        );
+        jdbcTemplate.update(sql, UUID.randomUUID(), username, email, password, roleId);
     }
 
     @Override
