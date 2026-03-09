@@ -1,6 +1,8 @@
 package com.primesprint.service;
 import com.primesprint.dto.UploadResponse;
 import org.apache.tika.Tika;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Files;
@@ -10,7 +12,8 @@ import java.util.UUID;
 
 @Service
 public class FileService {
-
+    AutoDetectParser parser = new AutoDetectParser();
+    BodyContentHandler handler = new BodyContentHandler(-1);
     private static final long MAX_SIZE = 20 * 1024 * 1024;
 
     public UploadResponse processFile(MultipartFile file) throws Exception {
@@ -33,6 +36,7 @@ public class FileService {
         if (!(filename.endsWith(".txt") || filename.endsWith(".csv") || filename.endsWith(".pdf") || filename.endsWith(".docx"))) {
 
             throw new RuntimeException("Unsupported file type");
+
         }
 
         // create secure temp file
@@ -44,12 +48,15 @@ public class FileService {
         Tika tika = new Tika();
         String extractedText = tika.parseToString(tempFile.toFile());
 
-        // delete temp file immediately
-        Files.deleteIfExists(tempFile);
+        String text = tika.parseToString(tempFile.toFile());
 
-        // preview first 500 characters
-        String preview = extractedText.substring(0, Math.min(500, extractedText.length()));
+        text = text.replace("\\r\\n", "\n")
+                .replace("\\n", "\n")
+                .replace("\\r", "\n")
+                .replace("\\t", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
 
-        return new UploadResponse(UUID.randomUUID().toString(), preview);
+        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(500, text.length())));
     }
 }
