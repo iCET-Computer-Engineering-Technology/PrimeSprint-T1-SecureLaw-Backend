@@ -19,12 +19,12 @@ public class User implements UserDetails {
     private String username;
     private String email;
     private String password;
-    private UUID roleId;
+    private Role role;
     private String status;
     private UUID seniorId;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_"+ro));
+        return List.of(new SimpleGrantedAuthority("ROLE_"+role.getName()));
     }
 }

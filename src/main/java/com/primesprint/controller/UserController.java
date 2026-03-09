@@ -20,7 +20,7 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request){
 
-        User user = authService.login(request.getUsername());
+        User user = authService.login(request.getUsernameOrEmail());
 
         return ResponseEntity.ok(user);
     }
