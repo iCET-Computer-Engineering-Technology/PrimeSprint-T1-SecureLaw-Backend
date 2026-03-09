@@ -11,7 +11,7 @@ import java.util.UUID;
 @Service
 public class FileService {
 
-    private static final long MAX_SIZE = 30 * 1024 * 1024;
+    private static final long MAX_SIZE = 20 * 1024 * 1024;
 
     public UploadResponse processFile(MultipartFile file) throws Exception {
 
@@ -30,10 +30,7 @@ public class FileService {
         }
 
         // allow only these types
-        if (!(filename.endsWith(".txt") ||
-                filename.endsWith(".csv") ||
-                filename.endsWith(".pdf") ||
-                filename.endsWith(".docx"))) {
+        if (!(filename.endsWith(".txt") || filename.endsWith(".csv") || filename.endsWith(".pdf") || filename.endsWith(".docx"))) {
 
             throw new RuntimeException("Unsupported file type");
         }
