@@ -2,6 +2,7 @@ package com.primesprint.security;
 
 import com.primesprint.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -14,7 +15,8 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String userNameOrEmail) throws UsernameNotFoundException {
+    @NullMarked
+    public UserDetails loadUserByUsername( String userNameOrEmail) throws UsernameNotFoundException {
         return userRepository.findByUsernameOrEmail(userNameOrEmail);
     }
 }
