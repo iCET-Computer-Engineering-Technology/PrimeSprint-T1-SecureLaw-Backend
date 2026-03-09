@@ -45,10 +45,34 @@ public class UserRepositoryImpl implements UserRepository {
                             UUID.fromString(rs.getString("senior_id")) : null
             );
 
-            user.setRole(role);
+            user.setRole(com.primesprint.model.enums.Role.valueOf(role.getName()));
 
             return user;
 
         }, usernameOrEmail, usernameOrEmail);
+    }
+
+    @Override
+    public void saveUser(String username,
+                         String email,
+                         String password,
+                         UUID roleId) {
+
+        String sql = """
+            INSERT INTO users (username,email,password,role_id)VALUES (?,?,?,(SELECT id FROM roles WHERE name = ?))
+    """;
+
+        jdbcTemplate.update(
+                sql,
+                username,
+                email,
+                password,
+                roleId
+        );
+    }
+
+    @Override
+    public void updateUserStatus(UUID userId, String status) {
+
     }
 }

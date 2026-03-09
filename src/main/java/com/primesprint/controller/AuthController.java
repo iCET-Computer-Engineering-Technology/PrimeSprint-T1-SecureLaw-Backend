@@ -2,6 +2,7 @@ package com.primesprint.controller;
 
 import com.primesprint.model.dto.LoginRequest;
 import com.primesprint.model.dto.LoginResponse;
+import com.primesprint.model.dto.RegisterRequest;
 import com.primesprint.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -20,11 +21,16 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
 
-        String token = authService.login(
-                request.getUsernameOrEmail(),
-                request.getPassword()
-        );
+        LoginResponse response = authService.login(request);
 
-        return ResponseEntity.ok(new LoginResponse(token));
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+
+        authService.register(request);
+
+        return ResponseEntity.ok("User registered successfully");
     }
 }

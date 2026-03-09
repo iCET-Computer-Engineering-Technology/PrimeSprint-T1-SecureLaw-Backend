@@ -24,9 +24,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // Allow CORS preflight
-                    .requestMatchers("/auth/**").permitAll() // login/register open
-                    .requestMatchers("/admin/**").hasRole("SENIOR")
-                    .requestMatchers("/user/**").hasAnyRole("SENIOR","JUNIOR")
+                    .requestMatchers("/api/auth/**").permitAll() // login/register open
+                    .requestMatchers("/api/admin/**").hasRole("SENIOR")
+                    .requestMatchers("/api/user/**").hasAnyRole("SENIOR","JUNIOR")
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // Swagger open
                     .anyRequest().authenticated()
                     )
