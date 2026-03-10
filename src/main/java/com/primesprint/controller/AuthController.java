@@ -36,7 +36,7 @@ public class AuthController {
         // Build LoginResponse with all required fields
         UserDto user = authService.getUserFromToken(jwt);
         LoginResponse loginResponse = new LoginResponse(
-                "Login successful",
+                jwt,
                 Instant.now(),
                 user.getUsername()
         );
