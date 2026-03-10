@@ -8,6 +8,7 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
+    driver-class-name: org.postgresql.Driver
 
   flyway:
     enabled: true
