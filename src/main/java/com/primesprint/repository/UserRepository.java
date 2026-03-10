@@ -1,6 +1,6 @@
 package com.primesprint.repository;
 
-import com.primesprint.model.User;
+import com.primesprint.model.entity.User;
 
 import java.util.UUID;
 

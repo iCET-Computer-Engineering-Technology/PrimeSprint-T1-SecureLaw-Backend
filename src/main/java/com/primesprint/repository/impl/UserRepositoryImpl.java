@@ -1,7 +1,7 @@
 package com.primesprint.repository.impl;
 
-import com.primesprint.model.Role;
-import com.primesprint.model.User;
+import com.primesprint.model.entity.Role;
+import com.primesprint.model.entity.User;
 import com.primesprint.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;

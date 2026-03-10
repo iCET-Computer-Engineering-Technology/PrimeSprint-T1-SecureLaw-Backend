@@ -1,4 +1,4 @@
-package com.primesprint.model;
+package com.primesprint.model.entity;
 
 import lombok.*;
 import java.util.UUID;

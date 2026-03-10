@@ -1,6 +1,6 @@
 package com.primesprint.service;
 
-import com.primesprint.model.User;
+import com.primesprint.model.entity.User;
 import com.primesprint.model.dto.LoginRequest;
 import com.primesprint.model.dto.LoginResponse;
 import com.primesprint.model.dto.RegisterRequest;
@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.UUID;
+
 
 @Service
 @RequiredArgsConstructor
@@ -69,5 +70,28 @@ public class AuthService {
                 roleId
         );
     }
+    public String loginAndGetToken(LoginRequest request) {
+        // Authenticate user using login method
+        LoginResponse loginResponse = login(request);
 
+        // Return the JWT token
+        return loginResponse.getToken();
+    }
+
+    public boolean validateToken(String token) {
+        return jwtUtil.validateToken(token);
+    }
+
+    public User getUserFromToken(String token) {
+        String username = jwtUtil.extractUsername(token);
+        User user = userRepository.findByUsernameOrEmail(username);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User not found"
+            );
+        }
+        return user;
+    }
 }
