@@ -19,7 +19,8 @@ public class UserRepositoryImpl implements UserRepository {
     public User findByUsernameOrEmail(String usernameOrEmail) {
 
         String sql = """
-                SELECT u.id, u.username, u.email, u.password, u.status,
+                SELECT u.id, u.username, u.email, u.password, u.status,u.created_at,
+                       u.updated_at,
                        u.senior_id,
                        r.id AS role_id,
                        r.name AS role_name
@@ -41,6 +42,8 @@ public class UserRepositoryImpl implements UserRepository {
             user.setEmail(rs.getString("email"));
             user.setPassword(rs.getString("password"));
             user.setStatus(rs.getString("status"));
+            user.setCreatedAt(rs.getTimestamp("created_at"));
+            user.setUpdatedAt(rs.getTimestamp("updated_at"));
             user.setSeniorId(
                     rs.getString("senior_id") != null ?
                             UUID.fromString(rs.getString("senior_id")) : null

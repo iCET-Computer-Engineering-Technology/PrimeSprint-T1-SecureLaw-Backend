@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.sql.Timestamp;
 import java.util.UUID;
 
 @Getter
@@ -14,8 +15,9 @@ public class UserDto {
     private UUID id;
     private String username;
     private String email;
-    private String password;
     private Role role;
     private String status;
     private UUID seniorId;
+    private Timestamp createdAt;
+    private Timestamp updatedAt;
 }
