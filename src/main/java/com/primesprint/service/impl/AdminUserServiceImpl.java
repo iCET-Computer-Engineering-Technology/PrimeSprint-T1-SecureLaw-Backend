@@ -34,9 +34,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (adminUserRepository.existsByEmailIgnoreCase(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists");
         }
-        if (request.getSeniorId() != null && adminUserRepository.existsBySeniorId(request.getSeniorId())) {
-            throw new IllegalArgumentException("Senior ID already exists");
-        }
 
         Role role = roleRepository.findByName(request.getRole().name())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid role: " + request.getRole()));
@@ -60,7 +57,40 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public UserDto updateUser(UUID id, UserUpdateRequest request) {
-        return null;
+        User user = adminUserRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+
+        if (request.getUsername() != null && !request.getUsername().equals(user.getUsername())
+                && adminUserRepository.existsByUsername(request.getUsername())) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+        if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(user.getEmail())
+                && adminUserRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+        if (request.getRole() != null) {
+            Role role = roleRepository.findByName(request.getRole().name())
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid role: " + request.getRole()));
+            user.setRoleId(role.getId());
+        }
+        if (request.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        if (request.getSeniorId() != null) {
+            user.setSeniorId(request.getSeniorId());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        } else {
+            user.setStatus("ACTIVE");
+        }
+        //toDo;
+        user.setEmail(request.getEmail() != null ? request.getEmail() : user.getEmail());
+        user.setUsername(request.getUsername() != null ? request.getUsername() : user.getUsername());
+        user.setUpdatedAt(Timestamp.from(Instant.now()));
+
+        User updatedUser = adminUserRepository.update(user);
+        return userMapper.toDto(updatedUser);
     }
 
     @Override

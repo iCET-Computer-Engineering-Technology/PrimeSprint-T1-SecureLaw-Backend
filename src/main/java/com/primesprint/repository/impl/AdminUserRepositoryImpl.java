@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -53,5 +54,41 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
         String sql = "SELECT COUNT(*) FROM users WHERE senior_id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, seniorId);
         return count != null && count > 0;
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        String sql = """
+                SELECT u.id, u.username, u.email, u.password, u.status,
+                       u.senior_id,
+                       r.id AS role_id,
+                       r.name AS role_name
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                WHERE u.id = ?
+                """;
+
+        return jdbcTemplate.query(sql, (rs) -> {
+            if (rs.next()) {
+                User user = new User();
+                user.setId(UUID.fromString(rs.getString("id")));
+                user.setUsername(rs.getString("username"));
+                user.setEmail(rs.getString("email"));
+                user.setPassword(rs.getString("password"));
+                user.setStatus(rs.getString("status"));
+                user.setSeniorId(
+                        rs.getString("senior_id") != null ?
+                                UUID.fromString(rs.getString("senior_id")) : null
+                );
+                user.setRole(com.primesprint.model.enums.Role.valueOf(rs.getString("role_name")));
+                return Optional.of(user);
+            }
+            return Optional.empty();
+        }, id);
+    }
+
+    @Override
+    public User update(User user) {
+        return null;
     }
 }

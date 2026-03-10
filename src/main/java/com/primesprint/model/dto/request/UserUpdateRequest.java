@@ -18,4 +18,5 @@ public class UserUpdateRequest {
     private String password;
     private Role role;
     private UUID seniorId;
+    private String status;
 }

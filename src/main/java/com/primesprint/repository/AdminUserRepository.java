@@ -2,6 +2,7 @@ package com.primesprint.repository;
 
 import com.primesprint.model.entity.User;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AdminUserRepository {
@@ -12,4 +13,8 @@ public interface AdminUserRepository {
     User save(User user);
 
     boolean existsBySeniorId(UUID seniorId);
+
+    Optional<User> findById(UUID id);
+
+    User update(User user);
 }
