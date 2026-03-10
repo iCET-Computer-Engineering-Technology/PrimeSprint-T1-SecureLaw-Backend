@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.Date;
+import java.sql.Timestamp;
 import java.util.UUID;
 
 @Getter
@@ -18,6 +18,6 @@ public class UserDto {
     private Role role;
     private String status;
     private UUID seniorId;
-    private Date createdAt;
-    private Date updatedAt;
+    private Timestamp createdAt;
+    private Timestamp updatedAt;
 }
