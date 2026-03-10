@@ -1,6 +1,7 @@
 package com.primesprint.model.entity;
 
 import lombok.*;
+
 import java.util.UUID;
 
 @Getter

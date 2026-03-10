@@ -1,9 +1,11 @@
 package com.primesprint.service;
 
-import com.primesprint.model.entity.User;
+import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.LoginRequest;
 import com.primesprint.model.dto.LoginResponse;
 import com.primesprint.model.dto.RegisterRequest;
+import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.entity.User;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.repository.UserRepository;
 import com.primesprint.security.JwtUtil;
@@ -25,6 +27,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
+    private final UserMapper userMapper;
 
     public LoginResponse login(LoginRequest request) {
 
@@ -60,9 +63,8 @@ public class AuthService {
     }
 
     public void register(RegisterRequest request) {
-
         String hashedPassword = passwordEncoder.encode(request.getPassword());
-        UUID roleId = roleRepository.findRoleIdByName(request.getRole());
+        UUID roleId = roleRepository.findRoleIdByName(request.getRole().name());
         userRepository.saveUser(
                 request.getUsername(),
                 request.getEmail(),
@@ -70,6 +72,7 @@ public class AuthService {
                 roleId
         );
     }
+
     public String loginAndGetToken(LoginRequest request) {
         // Authenticate user using login method
         LoginResponse loginResponse = login(request);
@@ -82,7 +85,7 @@ public class AuthService {
         return jwtUtil.validateToken(token);
     }
 
-    public User getUserFromToken(String token) {
+    public UserDto getUserFromToken(String token) {
         String username = jwtUtil.extractUsername(token);
         User user = userRepository.findByUsernameOrEmail(username);
 
@@ -92,6 +95,6 @@ public class AuthService {
                     "User not found"
             );
         }
-        return user;
+        return userMapper.toDto(user);
     }
 }

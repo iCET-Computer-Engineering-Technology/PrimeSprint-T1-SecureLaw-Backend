@@ -1,9 +1,9 @@
 package com.primesprint.controller;
 
-import com.primesprint.model.entity.User;
 import com.primesprint.model.dto.LoginRequest;
 import com.primesprint.model.dto.LoginResponse;
 import com.primesprint.model.dto.RegisterRequest;
+import com.primesprint.model.dto.UserDto;
 import com.primesprint.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +34,7 @@ public class AuthController {
         response.addCookie(cookie);
 
         // Build LoginResponse with all required fields
-        User user = authService.getUserFromToken(jwt);
+        UserDto user = authService.getUserFromToken(jwt);
         LoginResponse loginResponse = new LoginResponse(
                 "Login successful",
                 Instant.now(),
@@ -51,11 +51,11 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<User> me(@CookieValue(name = "jwt", required = false) String token) {
+    public ResponseEntity<UserDto> me(@CookieValue(name = "jwt", required = false) String token) {
         if (token == null || !authService.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        User user = authService.getUserFromToken(token);
+        UserDto user = authService.getUserFromToken(token);
         return ResponseEntity.ok(user);
     }
 

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -18,16 +19,16 @@ public class UserRepositoryImpl implements UserRepository {
     public User findByUsernameOrEmail(String usernameOrEmail) {
 
         String sql = """
-            SELECT u.id, u.username, u.email, u.password, u.status,
-                   u.senior_id,
-                   r.id AS role_id,
-                   r.name AS role_name
-            FROM users u
-            JOIN roles r ON u.role_id = r.id
-            WHERE u.username = ? OR u.email = ?
-            """;
+                SELECT u.id, u.username, u.email, u.password, u.status,
+                       u.senior_id,
+                       r.id AS role_id,
+                       r.name AS role_name
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                WHERE u.username = ? OR u.email = ?
+                """;
 
-        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+        List<User> results = jdbcTemplate.query(sql, (rs, rowNum) -> {
 
             Role role = new Role(
                     UUID.fromString(rs.getString("role_id")),
@@ -50,6 +51,8 @@ public class UserRepositoryImpl implements UserRepository {
             return user;
 
         }, usernameOrEmail, usernameOrEmail);
+
+        return results.isEmpty() ? null : results.get(0);
     }
 
     @Override
@@ -59,9 +62,9 @@ public class UserRepositoryImpl implements UserRepository {
                          UUID roleId) {
 
         String sql = """
-            INSERT INTO users (id, username, email, password, role_id, status)
-            VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-            """;
+                INSERT INTO users (id, username, email, password, role_id, status)
+                VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+                """;
 
         jdbcTemplate.update(sql, UUID.randomUUID(), username, email, password, roleId);
     }
