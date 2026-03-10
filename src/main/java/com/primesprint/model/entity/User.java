@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+@Builder
 @Getter
 @Setter
 @AllArgsConstructor
@@ -22,6 +23,7 @@ public class User implements UserDetails {
     private String email;
     private String password;
     private Role role;
+    private UUID roleId;
     private String status;
     private UUID seniorId;
     private Timestamp createdAt;

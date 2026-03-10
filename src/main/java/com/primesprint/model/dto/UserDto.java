@@ -17,7 +17,6 @@ public class UserDto {
     private UUID id;
     private String username;
     private String email;
-    private String password;
     private Role role;
     private String status;
     private UUID seniorId;
