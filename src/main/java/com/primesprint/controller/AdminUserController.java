@@ -1,0 +1,50 @@
+package com.primesprint.controller;
+
+import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.dto.request.UserCreateRequest;
+import com.primesprint.model.dto.request.UserUpdateRequest;
+import com.primesprint.model.dto.response.ApiResponse;
+import com.primesprint.service.AdminUserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.util.UUID;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/admin/users")
+public class AdminUserController {
+
+    private final AdminUserService adminUserService;
+
+//    @GetMapping
+//    public ResponseEntity<ApiResponse<UserDto>> getUsers() {
+//        return null;
+//    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<UserDto>> createUser(@RequestBody UserCreateRequest request) {
+        UserDto createdUser = adminUserService.createUser(request);
+        URI location = URI.create("/api/admin/users/" + createdUser.getId());
+        return ResponseEntity.created(location).body(
+                ApiResponse.success(201, "User created successfully", createdUser)
+        );
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<UserDto>> updateUser(@RequestBody UserUpdateRequest request, @PathVariable UUID id) {
+        UserDto updatedUser = adminUserService.updateUser(id, request);
+        return ResponseEntity.ok(
+                ApiResponse.success(200, "User updated successfully", updatedUser)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable UUID id) {
+        adminUserService.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+}

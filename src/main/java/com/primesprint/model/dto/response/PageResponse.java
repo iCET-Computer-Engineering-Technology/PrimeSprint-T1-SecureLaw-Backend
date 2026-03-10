@@ -1,5 +1,6 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.response;
 
+import com.primesprint.model.dto.Page;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

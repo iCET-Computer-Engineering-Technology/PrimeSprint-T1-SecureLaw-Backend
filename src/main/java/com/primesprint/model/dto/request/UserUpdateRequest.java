@@ -1,4 +1,4 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.request;
 
 import com.primesprint.model.enums.Role;
 import lombok.AllArgsConstructor;
@@ -6,21 +6,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.sql.Timestamp;
 import java.util.UUID;
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
-public class UserDto {
-    private UUID id;
+@AllArgsConstructor
+public class UserUpdateRequest {
     private String username;
     private String email;
     private String password;
     private Role role;
-    private String status;
     private UUID seniorId;
-    private Timestamp createdAt;
-    private Timestamp updatedAt;
 }

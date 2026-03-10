@@ -6,8 +6,8 @@ CREATE TABLE roles
 
 INSERT INTO roles (name)
 VALUES ('SENIOR'),
-       ('JUNIOR')
-;
+       ('JUNIOR');
+
 CREATE TABLE users
 (
     id         UUID PRIMARY KEY      DEFAULT gen_random_uuid(),

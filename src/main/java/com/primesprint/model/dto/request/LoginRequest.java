@@ -1,4 +1,4 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.request;
 
 import lombok.*;
 
