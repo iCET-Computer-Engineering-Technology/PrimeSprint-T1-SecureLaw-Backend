@@ -57,6 +57,7 @@ public class FileService {
                 .replaceAll("\\s+", " ")
                 .trim();
 
-        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(5000000, text.length())));
+        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(25000000, text.length())));
+        //20mb can hold maximum 25 million characters to prevent memory issues
     }
 }
