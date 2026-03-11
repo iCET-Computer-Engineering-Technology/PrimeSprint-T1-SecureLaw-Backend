@@ -1,7 +1,9 @@
 package com.primesprint.service.impl;
 
 import com.primesprint.mapper.UserMapper;
+import com.primesprint.model.dto.Page;
 import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.dto.request.PageRequest;
 import com.primesprint.model.dto.request.UserCreateRequest;
 import com.primesprint.model.dto.request.UserUpdateRequest;
 import com.primesprint.model.entity.Role;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -84,7 +87,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         } else {
             user.setStatus("ACTIVE");
         }
-        //toDo;
+
         user.setEmail(request.getEmail() != null ? request.getEmail() : user.getEmail());
         user.setUsername(request.getUsername() != null ? request.getUsername() : user.getUsername());
         user.setUpdatedAt(Timestamp.from(Instant.now()));
@@ -95,6 +98,35 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void deleteUser(UUID id) {
+        User user = adminUserRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
 
+        if (adminUserRepository.existsBySeniorId(user.getId())) {
+            throw new IllegalStateException("Cannot delete user with assigned juniors");
+        }
+
+        adminUserRepository.delete(id);
+    }
+
+    @Override
+    public Page<UserDto> getUsers(PageRequest pageRequest, String search) {
+        int offset = (pageRequest.getPage() - 1) * pageRequest.getSize();
+        List<User> users;
+        long totalElements;
+        if(search != null && !search.isEmpty()) {
+            users = adminUserRepository.search(offset, pageRequest.getSize(),
+                    pageRequest.getSort(), pageRequest.getDirection(), search);
+            totalElements = adminUserRepository.count(search);
+        }else{
+            users = adminUserRepository.findAll(offset, pageRequest.getSize(),
+                    pageRequest.getSort(), pageRequest.getDirection());
+            totalElements = adminUserRepository.countAll();
+        }
+
+        int totalPages = (int) Math.ceil((double) totalElements / pageRequest.getSize());
+        List<UserDto> userDtos = users.stream()
+                .map(userMapper::toDto)
+                .toList();
+        return new Page<>(userDtos, totalPages, totalElements,pageRequest.getSize(), pageRequest.getPage());
     }
 }

@@ -1,9 +1,12 @@
 package com.primesprint.controller;
 
+import com.primesprint.model.dto.Page;
 import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.dto.request.PageRequest;
 import com.primesprint.model.dto.request.UserCreateRequest;
 import com.primesprint.model.dto.request.UserUpdateRequest;
 import com.primesprint.model.dto.response.ApiResponse;
+import com.primesprint.model.dto.response.PageResponse;
 import com.primesprint.service.AdminUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +22,21 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
 
-//    @GetMapping
-//    public ResponseEntity<ApiResponse<UserDto>> getUsers() {
-//        return null;
-//    }
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<UserDto>>> getUsers(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "username") String sort,
+        @RequestParam(defaultValue = "asc") String direction,
+        @RequestParam(required = false) String search
+    ) {
+        PageRequest pageRequest = new PageRequest(page, size, sort, direction);
+        Page<UserDto> userPage = adminUserService.getUsers(pageRequest, search);
+        PageResponse<UserDto> pageResponse = PageResponse.of(userPage);
+        return ResponseEntity.ok(
+                ApiResponse.success(200, "Users retrieved successfully", pageResponse)
+        );
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<UserDto>> createUser(@RequestBody UserCreateRequest request) {
