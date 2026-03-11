@@ -57,6 +57,6 @@ public class FileService {
                 .replaceAll("\\s+", " ")
                 .trim();
 
-        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(500, text.length())));
+        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(5000000, text.length())));
     }
 }
