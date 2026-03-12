@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +69,7 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
                 WHERE u.id = ?
                 """;
 
-        return jdbcTemplate.query(sql, (rs) -> {
+        return jdbcTemplate.query(sql, rs -> {
             if (rs.next()) {
                 User user = new User();
                 user.setId(UUID.fromString(rs.getString("id")));
@@ -118,8 +117,14 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
     @Override
     public List<User> findAll(int offset, int size, String sort, String direction) {
         String sql = String.format("""
-                SELECT u.id, u.username, u.email, u.password, u.status,
+                SELECT u.id,
+                       u.username,
+                       u.email,
+                       u.password,
+                       u.status,
                        u.senior_id,
+                       u.created_at,
+                       u.updated_at,
                        r.id AS role_id,
                        r.name AS role_name
                 FROM users u
@@ -135,6 +140,8 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
             user.setEmail(rs.getString("email"));
             user.setPassword(rs.getString("password"));
             user.setStatus(rs.getString("status"));
+            user.setCreatedAt(rs.getTimestamp("created_at"));
+            user.setUpdatedAt(rs.getTimestamp("updated_at"));
             user.setSeniorId(
                     rs.getString("senior_id") != null ?
                             UUID.fromString(rs.getString("senior_id")) : null

@@ -24,11 +24,11 @@ public class AdminUserController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<UserDto>>> getUsers(
-        @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int size,
-        @RequestParam(defaultValue = "username") String sort,
-        @RequestParam(defaultValue = "asc") String direction,
-        @RequestParam(required = false) String search
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "username") String sort,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(required = false) String search
     ) {
         PageRequest pageRequest = new PageRequest(page, size, sort, direction);
         Page<UserDto> userPage = adminUserService.getUsers(pageRequest, search);

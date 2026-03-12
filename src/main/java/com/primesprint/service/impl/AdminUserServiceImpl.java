@@ -113,11 +113,11 @@ public class AdminUserServiceImpl implements AdminUserService {
         int offset = (pageRequest.getPage() - 1) * pageRequest.getSize();
         List<User> users;
         long totalElements;
-        if(search != null && !search.isEmpty()) {
+        if (search != null && !search.isEmpty()) {
             users = adminUserRepository.search(offset, pageRequest.getSize(),
                     pageRequest.getSort(), pageRequest.getDirection(), search);
             totalElements = adminUserRepository.count(search);
-        }else{
+        } else {
             users = adminUserRepository.findAll(offset, pageRequest.getSize(),
                     pageRequest.getSort(), pageRequest.getDirection());
             totalElements = adminUserRepository.countAll();
@@ -127,6 +127,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         List<UserDto> userDtos = users.stream()
                 .map(userMapper::toDto)
                 .toList();
-        return new Page<>(userDtos, totalPages, totalElements,pageRequest.getSize(), pageRequest.getPage());
+        return new Page<>(userDtos, totalPages, totalElements, pageRequest.getSize(), pageRequest.getPage());
     }
 }

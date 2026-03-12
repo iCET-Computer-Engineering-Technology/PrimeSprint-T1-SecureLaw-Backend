@@ -18,8 +18,8 @@ public class PageResponse<T> {
     private boolean last;
 
     public static <T> PageResponse<T> of(Page<T> page) {
-        boolean first = page.getNumber() == 0;
-        boolean last = page.getNumber() == (page.getTotalPages() - 1);
+        boolean first = page.getNumber() == 1;
+        boolean last = page.getNumber() == (page.getTotalPages());
         return new PageResponse<>(
                 page.getContent(),
                 page.getNumber(),
