@@ -1,0 +1,31 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      cors:
+        allowed-origins: http://localhost:4200,https://prime-sprint-t1-secure-la-git-22a7c7-theekshana-nuwans-projects.vercel.app,https://securelaw.vercel.app,https://preview-securelaw.vercel.app
+        allowed-methods: GET,OPTIONS
+        allow-credentials: true
+  endpoint:
+    health:
+      show-details: never
