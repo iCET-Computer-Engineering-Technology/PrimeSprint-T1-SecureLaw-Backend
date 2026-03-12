@@ -38,7 +38,7 @@ public class AuthController {
         LoginResponse loginResponse = new LoginResponse(
                 jwt,
                 Instant.now(),
-                user.getUsername()
+                user.getRole().name()
         );
 
         return ResponseEntity.ok(loginResponse);
