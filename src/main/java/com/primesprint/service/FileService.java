@@ -9,12 +9,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
-
 @Service
 public class FileService {
     AutoDetectParser parser = new AutoDetectParser();
     BodyContentHandler handler = new BodyContentHandler(-1);
-    private static final long MAX_SIZE = 20 * 1024 * 1024;
+    private static final long MAX_SIZE = 5 * 1024 * 1024;
 
     public UploadResponse processFile(MultipartFile file) throws Exception {
 
@@ -57,7 +56,7 @@ public class FileService {
                 .replaceAll("\\s+", " ")
                 .trim();
 
-        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(25000000, text.length())));
-        //20mb can hold maximum 25 million characters to prevent memory issues
+        return new UploadResponse(UUID.randomUUID().toString(), text.substring(0, Math.min(5000000, text.length())));
+        //5mb can hold maximum 5 million characters to prevent memory issues
     }
 }
