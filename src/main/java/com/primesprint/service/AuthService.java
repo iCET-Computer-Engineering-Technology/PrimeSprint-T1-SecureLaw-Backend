@@ -104,7 +104,10 @@ public class AuthService {
         User user = userRepository.findByUsernameOrEmail(username);
 
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User not found"
+            );
         }
 
         return userMapper.toDto(user);
