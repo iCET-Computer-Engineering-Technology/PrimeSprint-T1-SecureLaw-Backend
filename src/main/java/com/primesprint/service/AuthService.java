@@ -31,7 +31,6 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
 
-
         User user = userRepository
                 .findByUsernameOrEmail(request.getUsernameOrEmail());
 
