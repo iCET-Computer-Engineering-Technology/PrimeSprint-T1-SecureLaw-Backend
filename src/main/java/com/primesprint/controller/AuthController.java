@@ -5,11 +5,10 @@ import com.primesprint.model.dto.LoginResponse;
 import com.primesprint.model.dto.RegisterRequest;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.service.AuthService;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -22,18 +21,11 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse response) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         // Authenticate user and generate JWT
         String jwt = authService.loginAndGetToken(request);
 
-        // Create HttpOnly cookie
-        Cookie cookie = new Cookie("jwt", jwt);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(24 * 60 * 60); // 1 day
-        response.addCookie(cookie);
-
-        // Build LoginResponse with all required fields
+        // Build LoginResponse with all required fields; client must store token and send it as Authorization: Bearer <token>
         UserDto user = authService.getUserFromToken(jwt);
         LoginResponse loginResponse = new LoginResponse(
                 jwt,
@@ -45,27 +37,21 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
         authService.register(request);
         return ResponseEntity.ok("User registered successfully");
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserDto> me(@CookieValue(name = "jwt", required = false) String token) {
-        if (token == null || !authService.validateToken(token)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        UserDto user = authService.getUserFromToken(token);
+    public ResponseEntity<UserDto> me(@AuthenticationPrincipal UserDetails userDetails) {
+        // User is resolved from SecurityContext that JwtFilter populated using Authorization: Bearer <token>
+        UserDto user = authService.getUserByUsername(userDetails.getUsername());
         return ResponseEntity.ok(user);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("jwt", null);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0); // delete cookie
-        response.addCookie(cookie);
-        return ResponseEntity.ok("Logged out successfully");
+    public ResponseEntity<String> logout() {
+        // Stateless JWT: logout is handled client-side by discarding the token.
+        return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
     }
 }

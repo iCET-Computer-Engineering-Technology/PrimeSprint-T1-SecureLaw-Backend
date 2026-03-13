@@ -31,6 +31,7 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
 
+
         User user = userRepository
                 .findByUsernameOrEmail(request.getUsernameOrEmail());
 
@@ -95,6 +96,17 @@ public class AuthService {
                     "User not found"
             );
         }
+        return userMapper.toDto(user);
+    }
+
+    public UserDto getUserByUsername(String username) {
+
+        User user = userRepository.findByUsernameOrEmail(username);
+
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
+
         return userMapper.toDto(user);
     }
 }
