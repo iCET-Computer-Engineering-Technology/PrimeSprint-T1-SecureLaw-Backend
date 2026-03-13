@@ -75,6 +75,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             Role role = roleRepository.findByName(request.getRole().name())
                     .orElseThrow(() -> new IllegalArgumentException("Invalid role: " + request.getRole()));
             user.setRoleId(role.getId());
+            user.setRole(com.primesprint.model.enums.Role.valueOf(role.getName()));
         }
         if (request.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -84,8 +85,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
-        } else {
-            user.setStatus("ACTIVE");
         }
 
         user.setEmail(request.getEmail() != null ? request.getEmail() : user.getEmail());
@@ -110,23 +109,32 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public Page<UserDto> getUsers(PageRequest pageRequest, String search) {
-        int offset = (pageRequest.getPage() - 1) * pageRequest.getSize();
+        int page = pageRequest.getPage();
+        int size = pageRequest.getSize();
+        if (page < 1) {
+            throw new IllegalArgumentException("Page index must be greater than or equal to 1");
+        }
+        if (size <= 0) {
+            throw new IllegalArgumentException("Page size must be greater than 0");
+        }
+
+        int offset = (page - 1) * size;
         List<User> users;
         long totalElements;
         if (search != null && !search.isEmpty()) {
-            users = adminUserRepository.search(offset, pageRequest.getSize(),
+            users = adminUserRepository.search(offset, size,
                     pageRequest.getSort(), pageRequest.getDirection(), search);
             totalElements = adminUserRepository.count(search);
         } else {
-            users = adminUserRepository.findAll(offset, pageRequest.getSize(),
+            users = adminUserRepository.findAll(offset, size,
                     pageRequest.getSort(), pageRequest.getDirection());
             totalElements = adminUserRepository.countAll();
         }
 
-        int totalPages = (int) Math.ceil((double) totalElements / pageRequest.getSize());
+        int totalPages = (int) Math.ceil((double) totalElements / size);
         List<UserDto> userDtos = users.stream()
                 .map(userMapper::toDto)
                 .toList();
-        return new Page<>(userDtos, totalPages, totalElements, pageRequest.getSize(), pageRequest.getPage());
+        return new Page<>(userDtos, totalPages, totalElements, size, page);
     }
 }
