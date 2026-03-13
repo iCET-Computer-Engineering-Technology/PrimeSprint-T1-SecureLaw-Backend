@@ -1,9 +1,9 @@
 package com.primesprint.controller;
 
-import com.primesprint.model.dto.LoginRequest;
-import com.primesprint.model.dto.LoginResponse;
-import com.primesprint.model.dto.RegisterRequest;
 import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.dto.request.LoginRequest;
+import com.primesprint.model.dto.request.RegisterRequest;
+import com.primesprint.model.dto.response.LoginResponse;
 import com.primesprint.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;

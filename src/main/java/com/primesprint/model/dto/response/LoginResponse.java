@@ -1,4 +1,4 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
