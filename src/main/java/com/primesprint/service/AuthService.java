@@ -97,4 +97,18 @@ public class AuthService {
         }
         return userMapper.toDto(user);
     }
+
+    public UserDto getUserByUsername(String username) {
+
+        User user = userRepository.findByUsernameOrEmail(username);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User not found"
+            );
+        }
+
+        return userMapper.toDto(user);
+    }
 }
