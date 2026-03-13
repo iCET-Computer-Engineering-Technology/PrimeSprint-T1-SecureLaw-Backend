@@ -61,4 +61,9 @@ public class AdminUserController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/hello")
+    public ResponseEntity<String> hello() {
+        return ResponseEntity.ok("Hello, Admin!");
+    }
+
 }

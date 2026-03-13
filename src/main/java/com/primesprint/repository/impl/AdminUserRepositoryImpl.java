@@ -167,8 +167,14 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
     @Override
     public List<User> search(int offset, int size, String sort, String direction, String search) {
         String sql = String.format("""
-                SELECT u.id, u.username, u.email, u.password, u.status,
+                SELECT u.id,
+                       u.username,
+                       u.email,
+                       u.password,
+                       u.status,
                        u.senior_id,
+                       u.created_at,
+                       u.updated_at,
                        r.id AS role_id,
                        r.name AS role_name
                 FROM users u
@@ -186,6 +192,9 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
             user.setEmail(rs.getString("email"));
             user.setPassword(rs.getString("password"));
             user.setStatus(rs.getString("status"));
+            user.setCreatedAt(rs.getTimestamp("created_at"));
+            user.setUpdatedAt(rs.getTimestamp("updated_at"));
+
             user.setSeniorId(
                     rs.getString("senior_id") != null ?
                             UUID.fromString(rs.getString("senior_id")) : null
