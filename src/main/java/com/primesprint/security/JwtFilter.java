@@ -30,6 +30,7 @@ public class JwtFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path.startsWith("/api/auth/login")
                 || path.startsWith("/api/auth/register")
+                || path.startsWith("/actuator/health")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs");
     }
