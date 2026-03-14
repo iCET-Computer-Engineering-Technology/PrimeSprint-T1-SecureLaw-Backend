@@ -16,7 +16,7 @@ public class UploadController {
     }
 
     @PostMapping("/upload")
-    public UploadResponse uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
+    public UploadResponse uploadFile(@RequestParam("file") MultipartFile file) {
         return fileService.processFile(file);
     }
 }

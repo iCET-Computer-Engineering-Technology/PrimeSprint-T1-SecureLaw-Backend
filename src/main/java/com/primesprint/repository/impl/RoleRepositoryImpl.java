@@ -17,7 +17,6 @@ public class RoleRepositoryImpl implements RoleRepository {
 
     @Override
     public UUID findRoleIdByName(String roleName) {
-
         String sql = "SELECT id FROM roles WHERE name = ?";
         return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> UUID.fromString(rs.getString("id")), roleName);
     }
