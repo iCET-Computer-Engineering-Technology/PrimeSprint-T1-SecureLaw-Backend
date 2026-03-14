@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/internal/pii")
+@RequestMapping("/api/internal/pii")
 public class PiiDetectController {
 
     private final PiiDetectService piiDetectService;
