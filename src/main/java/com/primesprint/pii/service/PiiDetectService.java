@@ -73,19 +73,16 @@ public class PiiDetectService {
 
     private final GroqLlmClient llmClient;
     private final ObjectMapper objectMapper;
-    private final boolean logRawLlm;
 
     private final int maxRetries;
     private final Duration retryBackoff;
 
     public PiiDetectService(GroqLlmClient llmClient,
                             ObjectMapper objectMapper,
-                            @Value("${pii.log-llm-raw-response:false}") boolean logRawLlm,
                             @Value("${llm.max-retries:2}") int maxRetries,
                             @Value("${llm.retry-backoff-ms:500}") long retryBackoffMs) {
         this.llmClient = llmClient;
         this.objectMapper = objectMapper;
-        this.logRawLlm = logRawLlm;
         this.maxRetries = Math.max(0, maxRetries);
         this.retryBackoff = Duration.ofMillis(Math.max(0, retryBackoffMs));
     }
@@ -132,11 +129,6 @@ public class PiiDetectService {
                 String raw = llmClient.chatRaw(SYSTEM_PROMPT, text).block();
                 if (raw == null) {
                     return new ParseResult(true, "LLM_EMPTY_RESPONSE", List.of());
-                }
-
-                if (logRawLlm) {
-                    // WARNING: raw model output may contain PII; enable only in local dev
-                    log.warn("pii-detect DEBUG requestId={} source={} llmRaw={}", requestId, source, raw);
                 }
 
                 List<SensitiveDataItem> items = parseGroqResponseToItems(raw, text, source, requestId);

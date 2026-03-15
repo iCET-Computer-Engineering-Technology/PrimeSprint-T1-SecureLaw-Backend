@@ -26,10 +26,6 @@ llm:
   max-retries: ${LLM_MAX_RETRIES:2}
   retry-backoff-ms: ${LLM_RETRY_BACKOFF_MS:500}
 
-pii:
-  # For local debugging only. Never enable in production.
-  log-llm-raw-response: ${PII_LOG_LLM_RAW_RESPONSE:false}
-
 management:
   endpoints:
     web:
