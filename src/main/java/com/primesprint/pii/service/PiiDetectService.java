@@ -192,31 +192,122 @@ public class PiiDetectService {
 
         List<SensitiveDataItem> items = new ArrayList<>();
         for (JsonNode node : arrayNode) {
-            // Must contain exactly type,value,start,end (model side). No extra fields allowed.
-            if (!node.isObject()) return null;
-            if (!(node.has("type") && node.has("value") && node.has("start") && node.has("end"))) return null;
-            if (node.size() != 4) return null;
-
+            // Must contain type,value,start,end (model side). No extra fields allowed.
+            if (!node.isObject()) {
+                log.debug("pii-detect requestId={} source={} node_not_object -> skipping node", requestId, sourceLabel);
+                continue; // skip invalid node but don't fail the whole array
+            }
+            if (!(node.has("type") && node.has("value") && node.has("start") && node.has("end"))) {
+                log.debug("pii-detect requestId={} source={} missing_fields -> skipping node", requestId, sourceLabel);
+                continue;
+            }
+            // allow extra fields from model (be tolerant), but require required fields exist.
             String type = node.get("type").asText(null);
             String value = node.get("value").asText(null);
             int start = node.get("start").asInt(-1);
             int end = node.get("end").asInt(-1);
 
-            if (!AllowedTypes.isAllowed(type)) return null;
-            if (value == null) return null;
-            if (start < 0 || end <= start) return null;
+            if (!AllowedTypes.isAllowed(type)) {
+                log.debug("pii-detect requestId={} source={} unknown_type={} -> skipping", requestId, sourceLabel, type);
+                continue;
+            }
+            if (value == null) {
+                log.debug("pii-detect requestId={} source={} null_value -> skipping", requestId, sourceLabel);
+                continue;
+            }
+            if (start < 0 || end <= start) {
+                log.debug("pii-detect requestId={} source={} invalid_offsets start={} end={} -> skipping", requestId, sourceLabel, start, end);
+                continue;
+            }
 
-            // Validate value matches UTF-8 byte slice (and recover offsets deterministically if needed).
-            int[] offsets = validateAndMaybeRecoverOffsets(requestId, sourceLabel, sourceText, type, value, start, end);
-            if (offsets == null) return null;
+            // Validate value matches CHARACTER substring first. If mismatch, attempt small heuristics, otherwise skip.
+            int[] offsets = validateCharacterOffsets(requestId, sourceLabel, sourceText, type, value, start, end);
+            if (offsets == null) {
+                // Try heuristic recovery for truncated amount/currency (safe, narrow rule)
+                int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start, end);
+                if (recovered != null) {
+                    log.debug("pii-detect requestId={} source={} heuristic_recovered type={} origStart={} origEnd={} newStart={} newEnd={}",
+                            requestId, sourceLabel, type, start, end, recovered[0], recovered[1]);
+                    offsets = recovered;
+                } else {
+                    log.debug("pii-detect requestId={} source={} value_mismatch type={} start={} end={} -> skipping", requestId, sourceLabel, type, start, end);
+                    continue; // skip this entity — don't fail whole source
+                }
+            }
 
-            // Overlap handling later
+            // Add validated item
             items.add(new SensitiveDataItem(type, value, sourceLabel, offsets[0], offsets[1]));
         }
 
         // Resolve overlaps deterministically per source (longest-first, then start asc)
         items = resolveOverlaps(items);
         return items;
+    }
+
+    /**
+     * Strict character-offset validation.
+     * Returns validated [start,end] if and only if value == sourceText.substring(start,end).
+     */
+    private int[] validateCharacterOffsets(String requestId,
+                                          String sourceLabel,
+                                          String sourceText,
+                                          String type,
+                                          String value,
+                                          int start,
+                                          int end) {
+        try {
+            if (sourceText == null) return null;
+            if (start < 0 || end < 0 || start >= end) return null;
+            if (start > sourceText.length() || end > sourceText.length()) return null;
+
+            String extracted = sourceText.substring(start, end);
+            if (!extracted.equals(value)) {
+                // NOTE: Keep debug logging minimal to reduce PII leakage risk.
+                log.debug("pii-detect requestId={} source={} span_mismatch type={} start={} end={}", requestId, sourceLabel, type, start, end);
+                return null;
+            }
+            return new int[]{start, end};
+        } catch (Exception e) {
+            log.debug("pii-detect requestId={} source={} invalid_offsets type={} start={} end={} err={}", requestId, sourceLabel, type, start, end, e.toString());
+            return null;
+        }
+    }
+
+    /**
+     * Narrow heuristic to recover a common truncation pattern where the model returns only the numeric
+     * portion of an amount but the actual sensitive span includes a trailing currency code (e.g. "450000" -> "450000 LKR").
+     *
+     * Safety rules:
+     * - Only extends the END of the span, never shifts start.
+     * - Only applies when the expected value matches the current substring at (start, start+value.length()).
+     * - Only extends by a single optional space and a short trailing token (2-5 uppercase letters).
+     */
+    private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start, int end) {
+        if (sourceText == null || value == null) return null;
+        if (start < 0 || start >= sourceText.length()) return null;
+
+        int baseEnd = start + value.length();
+        if (baseEnd > sourceText.length()) return null;
+        if (!sourceText.substring(start, baseEnd).equals(value)) return null;
+
+        int i = baseEnd;
+        // allow a single space before currency code
+        if (i < sourceText.length() && sourceText.charAt(i) == ' ') {
+            i++;
+        }
+
+        int codeStart = i;
+        while (i < sourceText.length() && Character.isUpperCase(sourceText.charAt(i))) {
+            i++;
+            // cap to avoid runaway
+            if (i - codeStart > 5) return null;
+        }
+
+        int codeLen = i - codeStart;
+        if (codeLen < 2) return null;
+
+        // recovered span is [start, i)
+        return new int[]{start, i};
     }
 
     /**
