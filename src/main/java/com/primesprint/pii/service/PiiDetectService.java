@@ -15,8 +15,10 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class PiiDetectService {
@@ -238,9 +240,53 @@ public class PiiDetectService {
             items.add(new SensitiveDataItem(type, value, sourceLabel, offsets[0], offsets[1]));
         }
 
+        // After loop building 'items'
+        // Duplicate span expansion (LLM may only return one occurrence)
+        items = expandDuplicateSpans(sourceText, items);
+
+        // De-duplicate exact spans after expansion
+        items = dedupeBySpanKey(items);
+
         // Resolve overlaps deterministically per source (longest-first, then start asc)
-        items = resolveOverlaps(items);
-        return items;
+        return resolveOverlaps(items);
+    }
+
+    /**
+     * Duplicate span expansion: for each item value, find all literal occurrences and emit a span for each.
+     * Uses character-based indexOf.
+     */
+    private List<SensitiveDataItem> expandDuplicateSpans(String sourceText, List<SensitiveDataItem> items) {
+        if (items == null || items.isEmpty()) return items;
+        List<SensitiveDataItem> expanded = new ArrayList<>();
+        for (SensitiveDataItem item : items) {
+            String value = item.getValue();
+            if (value == null || value.isEmpty() || sourceText == null || sourceText.isEmpty()) {
+                // fallback: keep original
+                expanded.add(item);
+                continue;
+            }
+            int from = 0;
+            while (from <= sourceText.length()) {
+                int idx = sourceText.indexOf(value, from);
+                if (idx < 0) break;
+                int end = idx + value.length();
+                expanded.add(new SensitiveDataItem(item.getType(), value, item.getSource(), idx, end));
+                from = idx + 1; // allow overlapping occurrences
+            }
+        }
+        return expanded;
+    }
+
+    /** De-duplicate by (type, source, start, end). */
+    private List<SensitiveDataItem> dedupeBySpanKey(List<SensitiveDataItem> items) {
+        if (items == null || items.isEmpty()) return items;
+        Set<String> seen = new HashSet<>(items.size() * 2);
+        List<SensitiveDataItem> out = new ArrayList<>(items.size());
+        for (SensitiveDataItem i : items) {
+            String key = i.getType() + "|" + i.getSource() + "|" + i.getStart() + "|" + i.getEnd();
+            if (seen.add(key)) out.add(i);
+        }
+        return out;
     }
 
     /**
