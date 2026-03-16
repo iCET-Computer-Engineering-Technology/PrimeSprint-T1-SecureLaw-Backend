@@ -53,6 +53,8 @@ public class PiiDetectService {
             
             8. Entities must represent the exact contiguous span of the sensitive value.
                Do not include surrounding labels such as "Email:", "Phone:", etc.
+               Amounts may include currency labels as part of the sensitive span (e.g., "450,000 LKR", "LKR 450,000").
+               Alphanumeric IDs may include letters, digits, and separators (e.g., "DC-2026-7781", "AGR-2024-4451").
             
             9. Do NOT merge multiple occurrences into one entry.
             
@@ -298,23 +300,60 @@ public class PiiDetectService {
 
     private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start, int end) {
         if (sourceText == null || value == null) return null;
-        if (!value.matches("^[0-9]{2,}(?:[.,][0-9]{2,})?$")) return null;
 
-        int lookStart = Math.max(0, end);
-        int lookEnd = Math.min(sourceText.length(), end + 8);
-        if (lookStart >= lookEnd) return null;
-        String tail = sourceText.substring(lookStart, lookEnd);
+        if (!sourceText.contains(value)) return null;
 
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s+([A-Z]{2,4})\\b").matcher(tail);
-        if (m.find()) {
-            int newEnd = end + m.end();
-            if (newEnd > sourceText.length()) return null;
+        String safeValue = java.util.regex.Pattern.quote(value);
 
-            String candidate = sourceText.substring(start, newEnd);
-            if (candidate.startsWith(value) && candidate.length() > value.length()) {
-                return new int[]{start, newEnd};
+        boolean isNumericAmount = value.matches("^[0-9]{2,}(?:[.,][0-9]{2,})?$");
+        if (isNumericAmount) {
+            java.util.regex.Pattern amountPattern = java.util.regex.Pattern.compile("^(?:\\s*([A-Z]{2,4})\\s+)?" + safeValue + "(?:\\s+([A-Z]{2,4}))?\\b");
+
+            int windowStart = Math.max(0, start - 8);
+            int windowEnd = Math.min(sourceText.length(), end + 8);
+            if (windowStart < windowEnd) {
+                String window = sourceText.substring(windowStart, windowEnd);
+                java.util.regex.Matcher m = amountPattern.matcher(window);
+                if (m.find()) {
+                    int candStart = windowStart + m.start();
+                    int candEnd = windowStart + m.end();
+                    if (candStart <= start && candEnd >= end) {
+                        return new int[]{candStart, candEnd};
+                    }
+                }
             }
         }
+
+        if (value.matches(".*[A-Za-z].*") || value.contains("-") || value.contains("_") || value.contains("/") || value.contains(":") || value.contains(".")) {
+            int len = sourceText.length();
+            int left = Math.min(Math.max(0, start), len);
+            int right = Math.min(Math.max(0, end), len);
+
+            while (left > 0) {
+                char c = sourceText.charAt(left - 1);
+                if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '/' || c == ':' || c == '.') {
+                    left--;
+                } else {
+                    break;
+                }
+            }
+            while (right < len) {
+                char c = sourceText.charAt(right);
+                if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '/' || c == ':' || c == '.') {
+                    right++;
+                } else {
+                    break;
+                }
+            }
+
+            if (left < right) {
+                String candidate = sourceText.substring(left, right);
+                if (candidate.contains(value) && candidate.length() > value.length()) {
+                    return new int[]{left, right};
+                }
+            }
+        }
+
         return null;
     }
 
