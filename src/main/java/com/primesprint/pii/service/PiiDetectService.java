@@ -7,7 +7,6 @@ import com.primesprint.pii.client.GroqLlmClient;
 import com.primesprint.pii.dto.PiiDetectRequest;
 import com.primesprint.pii.dto.SensitiveDataItem;
 import com.primesprint.pii.util.AllowedTypes;
-import com.primesprint.pii.util.Utf8ByteUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -224,7 +223,7 @@ public class PiiDetectService {
             int[] offsets = validateCharacterOffsets(requestId, sourceLabel, sourceText, type, value, start, end);
             if (offsets == null) {
                 // Try heuristic recovery for truncated amount/currency (safe, narrow rule)
-                int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start, end);
+                int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start);
                 if (recovered != null) {
                     log.debug("pii-detect requestId={} source={} heuristic_recovered type={} origStart={} origEnd={} newStart={} newEnd={}",
                             requestId, sourceLabel, type, start, end, recovered[0], recovered[1]);
@@ -255,6 +254,7 @@ public class PiiDetectService {
                                           String value,
                                           int start,
                                           int end) {
+        // requestId is included for uniform logging context in callers (kept intentionally even if not always used).
         try {
             if (sourceText == null) return null;
             if (start < 0 || end < 0 || start >= end) return null;
@@ -262,13 +262,16 @@ public class PiiDetectService {
 
             String extracted = sourceText.substring(start, end);
             if (!extracted.equals(value)) {
-                // NOTE: Keep debug logging minimal to reduce PII leakage risk.
-                log.debug("pii-detect requestId={} source={} span_mismatch type={} start={} end={}", requestId, sourceLabel, type, start, end);
+                // Don't log raw values in production; only debug with redaction (lengths only).
+                log.debug("pii-detect stage={} value_mismatch type={} start={} end={} extractedLen={} valueLen={}",
+                        sourceLabel, type, start, end,
+                        extracted.length(),
+                        value == null ? 0 : value.length());
                 return null;
             }
             return new int[]{start, end};
         } catch (Exception e) {
-            log.debug("pii-detect requestId={} source={} invalid_offsets type={} start={} end={} err={}", requestId, sourceLabel, type, start, end, e.toString());
+            log.debug("pii-detect stage={} invalid_offsets type={} start={} end={} err={}", sourceLabel, type, start, end, e.toString());
             return null;
         }
     }
@@ -282,7 +285,7 @@ public class PiiDetectService {
      * - Only applies when the expected value matches the current substring at (start, start+value.length()).
      * - Only extends by a single optional space and a short trailing token (2-5 uppercase letters).
      */
-    private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start, int end) {
+    private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start) {
         if (sourceText == null || value == null) return null;
         if (start < 0 || start >= sourceText.length()) return null;
 
@@ -310,58 +313,6 @@ public class PiiDetectService {
         return new int[]{start, i};
     }
 
-    /**
-     * Returns validated byte offsets [start,end] or null (meaning: invalid -> fallback per story).
-     * <p>
-     * Note: Story says offsets are UTF-8 byte offsets. In practice, some LLMs return char offsets;
-     * we attempt deterministic recovery to keep the endpoint useful.
-     */
-    private int[] validateAndMaybeRecoverOffsets(String requestId,
-                                                 String sourceLabel,
-                                                 String sourceText,
-                                                 String type,
-                                                 String value,
-                                                 int start,
-                                                 int end) {
-        try {
-            String slice = Utf8ByteUtils.sliceByUtf8ByteOffsets(sourceText, start, end);
-            if (value.equals(slice)) return new int[]{start, end};
-
-            // Recovery: some models return "character" offsets instead of bytes.
-            // Convert char offsets to byte offsets and try again.
-            int recoveredStart = sourceText.substring(0, Math.min(start, sourceText.length())).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-            int recoveredEnd = sourceText.substring(0, Math.min(end, sourceText.length())).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-            try {
-                String recoveredSlice = Utf8ByteUtils.sliceByUtf8ByteOffsets(sourceText, recoveredStart, recoveredEnd);
-                if (value.equals(recoveredSlice)) {
-                    log.debug("pii-detect stage={} offsets_recovered_by_char_to_byte type={}", sourceLabel, type);
-                    return new int[]{recoveredStart, recoveredEnd};
-                }
-            } catch (Exception ignored) {
-            }
-
-            // Recovery: search by value bytes (first occurrence). Only accept if aligns exactly.
-            int idx = Utf8ByteUtils.indexOfUtf8Bytes(sourceText, value);
-            if (idx >= 0) {
-                int recoveredEndBySearch = idx + value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-                try {
-                    String recoveredSlice = Utf8ByteUtils.sliceByUtf8ByteOffsets(sourceText, idx, recoveredEndBySearch);
-                    if (value.equals(recoveredSlice)) {
-                        log.debug("pii-detect stage={} offsets_recovered_by_search type={}", sourceLabel, type);
-                        return new int[]{idx, recoveredEndBySearch};
-                    }
-                } catch (Exception ignored) {
-                }
-                log.debug("pii-detect stage={} offsets_recovered_by_search type={}", sourceLabel, type);
-            }
-
-            log.debug("pii-detect stage={} value_mismatch type={} start={} end={}", sourceLabel, type, start, end);
-            return null;
-        } catch (Exception e) {
-            log.debug("pii-detect stage={} invalid_offsets type={} start={} end={} err={}", sourceLabel, type, start, end, e.toString());
-            return null;
-        }
-    }
 
     private List<SensitiveDataItem> resolveOverlaps(List<SensitiveDataItem> items) {
         if (items.isEmpty()) return items;
