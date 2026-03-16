@@ -223,7 +223,7 @@ public class PiiDetectService {
             int[] offsets = validateCharacterOffsets(requestId, sourceLabel, sourceText, type, value, start, end);
             if (offsets == null) {
                 // Try heuristic recovery for truncated amount/currency (safe, narrow rule)
-                int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start);
+                int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start, end);
                 if (recovered != null) {
                     log.debug("pii-detect requestId={} source={} heuristic_recovered type={} origStart={} origEnd={} newStart={} newEnd={}",
                             requestId, sourceLabel, type, start, end, recovered[0], recovered[1]);
@@ -277,40 +277,33 @@ public class PiiDetectService {
     }
 
     /**
-     * Narrow heuristic to recover a common truncation pattern where the model returns only the numeric
-     * portion of an amount but the actual sensitive span includes a trailing currency code (e.g. "450000" -> "450000 LKR").
-     *
-     * Safety rules:
-     * - Only extends the END of the span, never shifts start.
-     * - Only applies when the expected value matches the current substring at (start, start+value.length()).
-     * - Only extends by a single optional space and a short trailing token (2-5 uppercase letters).
+     * Heuristic: if the model returned a numeric value and the source text immediately after end contains
+     * a currency suffix like " LKR" or " USD" or " EUR" (2-4 uppercase letters), expand the end to include it.
+     * Returns new [start,end] (character offsets) or null.
      */
-    private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start) {
+    private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start, int end) {
         if (sourceText == null || value == null) return null;
-        if (start < 0 || start >= sourceText.length()) return null;
+        // narrow: only for numeric-ish values (digits, maybe commas/dots)
+        if (!value.matches("^[0-9]{2,}(?:[.,][0-9]{2,})?$")) return null;
 
-        int baseEnd = start + value.length();
-        if (baseEnd > sourceText.length()) return null;
-        if (!sourceText.substring(start, baseEnd).equals(value)) return null;
+        // look ahead up to 8 characters for " SPACE + 2-4 letters"
+        int lookStart = Math.max(0, end);
+        int lookEnd = Math.min(sourceText.length(), end + 8);
+        if (lookStart >= lookEnd) return null;
+        String tail = sourceText.substring(lookStart, lookEnd);
 
-        int i = baseEnd;
-        // allow a single space before currency code
-        if (i < sourceText.length() && sourceText.charAt(i) == ' ') {
-            i++;
+        // match patterns like " LKR", " USD", " EUR"
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s+([A-Z]{2,4})\\b").matcher(tail);
+        if (m.find()) {
+            int newEnd = end + m.end(); // extend end to include the currency suffix
+            if (newEnd > sourceText.length()) return null;
+            // sanity check: ensure substring equals value + " " + currency (approx)
+            String candidate = sourceText.substring(start, newEnd);
+            if (candidate.startsWith(value) && candidate.length() > value.length()) {
+                return new int[]{start, newEnd};
+            }
         }
-
-        int codeStart = i;
-        while (i < sourceText.length() && Character.isUpperCase(sourceText.charAt(i))) {
-            i++;
-            // cap to avoid runaway
-            if (i - codeStart > 5) return null;
-        }
-
-        int codeLen = i - codeStart;
-        if (codeLen < 2) return null;
-
-        // recovered span is [start, i)
-        return new int[]{start, i};
+        return null;
     }
 
 
