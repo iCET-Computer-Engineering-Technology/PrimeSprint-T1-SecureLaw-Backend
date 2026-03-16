@@ -33,10 +33,6 @@ public class GroqLlmClient {
                 .build();
     }
 
-    /**
-     * Calls Groq/OpenAI-style chat completions.
-     * Returns the raw JSON response body (we parse and extract content in service).
-     */
     public Mono<String> chatRaw(String systemPrompt, String text) {
         Map<String, Object> payload = Map.of(
                 "model", model,

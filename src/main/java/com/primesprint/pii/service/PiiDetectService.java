@@ -7,23 +7,14 @@ import com.primesprint.pii.client.GroqLlmClient;
 import com.primesprint.pii.dto.PiiDetectRequest;
 import com.primesprint.pii.dto.SensitiveDataItem;
 import com.primesprint.pii.util.AllowedTypes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class PiiDetectService {
-    private static final Logger log = LoggerFactory.getLogger(PiiDetectService.class);
-
     private static final String SYSTEM_PROMPT = """
             You are a PII extraction service.
             
@@ -89,42 +80,26 @@ public class PiiDetectService {
     }
 
     public List<SensitiveDataItem> detect(PiiDetectRequest request) {
-        String requestId = request.getRequestId();
         String doc = Optional.ofNullable(request.getDocumentExtractedContent()).orElse("");
         String prompt = Optional.ofNullable(request.getUserPrompt()).orElse("");
 
-        // Per story: detect separately on each source and combine.
-        // Safe fallback: if either fails validation -> []
-        var docRes = callParseValidateWithRetry(requestId, "document", doc);
-        if (docRes.failed) {
-            log.debug("pii-detect requestId={} stage=document_parse_failed errorCode={} -> fallback=[]", requestId, docRes.errorCode);
-            return List.of();
-        }
+        var docRes = callParseValidateWithRetry("document", doc);
+        var promptRes = callParseValidateWithRetry("prompt", prompt);
 
-        var promptRes = callParseValidateWithRetry(requestId, "prompt", prompt);
-        if (promptRes.failed) {
-            log.debug("pii-detect requestId={} stage=prompt_parse_failed errorCode={} -> fallback=[]", requestId, promptRes.errorCode);
-            return List.of();
-        }
+        List<SensitiveDataItem> combined = new ArrayList<>();
+        if (!docRes.failed) combined.addAll(docRes.items);
+        if (!promptRes.failed) combined.addAll(promptRes.items);
 
-        List<SensitiveDataItem> combined = new ArrayList<>(docRes.items.size() + promptRes.items.size());
-        combined.addAll(docRes.items);
-        combined.addAll(promptRes.items);
-
-        log.info("pii-detect requestId={} docEntities={} promptEntities={} totalEntities={}",
-                requestId, docRes.items.size(), promptRes.items.size(), combined.size());
+        combined = dedupeBySpanKey(combined);
+        combined = resolveOverlaps(combined);
         return combined;
     }
 
-    private record ParseResult(boolean failed, String errorCode, List<SensitiveDataItem> items) {
-    }
-
-    private ParseResult callParseValidateWithRetry(String requestId, String source, String text) {
+    private ParseResult callParseValidateWithRetry(String source, String text) {
         if (text == null || text.isBlank()) {
             return new ParseResult(false, null, List.of());
         }
 
-        Exception lastEx = null;
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 String raw = llmClient.chatRaw(SYSTEM_PROMPT, text).block();
@@ -132,15 +107,12 @@ public class PiiDetectService {
                     return new ParseResult(true, "LLM_EMPTY_RESPONSE", List.of());
                 }
 
-                List<SensitiveDataItem> items = parseGroqResponseToItems(raw, text, source, requestId);
-                // parseGroqResponseToItems returns null to indicate "fallback"-worthy failure
+                List<SensitiveDataItem> items = parseGroqResponseToItems(raw, text, source);
                 if (items == null) {
                     return new ParseResult(true, "LLM_INVALID_OR_VALIDATION_FAILED", List.of());
                 }
                 return new ParseResult(false, null, items);
             } catch (Exception ex) {
-                lastEx = ex;
-                log.warn("pii-detect requestId={} source={} llm_call_failed attempt={}/{} err={}", requestId, source, attempt + 1, maxRetries + 1, ex.toString());
                 if (attempt < maxRetries) {
                     try {
                         Thread.sleep(retryBackoff.toMillis());
@@ -151,12 +123,12 @@ public class PiiDetectService {
                 }
             }
         }
-        log.warn("pii-detect requestId={} source={} llm_failed_after_retries lastErr={}", requestId, source, lastEx == null ? null : lastEx.toString());
         return new ParseResult(true, "LLM_CALL_FAILED", List.of());
     }
 
-    private List<SensitiveDataItem> parseGroqResponseToItems(String groqResponseJson, String sourceText, String sourceLabel, String requestId) {
-        // Groq returns OpenAI-like response shape; we must extract choices[0].message.content
+    private List<SensitiveDataItem> parseGroqResponseToItems(String groqResponseJson,
+                                                             String sourceText,
+                                                             String sourceLabel) {
         String content;
         try {
             JsonNode root = objectMapper.readTree(groqResponseJson);
@@ -166,22 +138,20 @@ public class PiiDetectService {
             content = message.path("content").asText(null);
             if (content == null) return null;
         } catch (JsonProcessingException e) {
-            // Sometimes we might be directly returned the array (e.g. mocked WireMock). Support that too.
             content = groqResponseJson;
         }
 
-        // Content should be JSON array; if wrapped, extract first array substring.
         JsonNode arrayNode;
         try {
             arrayNode = objectMapper.readTree(content);
             if (!arrayNode.isArray()) {
-                String extracted = extractFirstJsonArray(content);
+                String extracted = extractFirstJsonArray(stripMarkdownCodeFences(content));
                 if (extracted == null) return null;
                 arrayNode = objectMapper.readTree(extracted);
                 if (!arrayNode.isArray()) return null;
             }
         } catch (Exception e) {
-            String extracted = extractFirstJsonArray(content);
+            String extracted = extractFirstJsonArray(stripMarkdownCodeFences(content));
             if (extracted == null) return null;
             try {
                 arrayNode = objectMapper.readTree(extracted);
@@ -193,91 +163,112 @@ public class PiiDetectService {
 
         List<SensitiveDataItem> items = new ArrayList<>();
         for (JsonNode node : arrayNode) {
-            // Must contain type,value,start,end (model side). No extra fields allowed.
             if (!node.isObject()) {
-                log.debug("pii-detect requestId={} source={} node_not_object -> skipping node", requestId, sourceLabel);
-                continue; // skip invalid node but don't fail the whole array
-            }
-            if (!(node.has("type") && node.has("value") && node.has("start") && node.has("end"))) {
-                log.debug("pii-detect requestId={} source={} missing_fields -> skipping node", requestId, sourceLabel);
                 continue;
             }
-            // allow extra fields from model (be tolerant), but require required fields exist.
+            if (!(node.has("type") && node.has("value") && node.has("start") && node.has("end"))) {
+                continue;
+            }
             String type = node.get("type").asText(null);
+            if (type != null) type = type.trim().toUpperCase(Locale.ROOT);
+
             String value = node.get("value").asText(null);
+            if (value != null) value = value.trim();
             int start = node.get("start").asInt(-1);
             int end = node.get("end").asInt(-1);
 
             if (!AllowedTypes.isAllowed(type)) {
-                log.debug("pii-detect requestId={} source={} unknown_type={} -> skipping", requestId, sourceLabel, type);
                 continue;
             }
             if (value == null) {
-                log.debug("pii-detect requestId={} source={} null_value -> skipping", requestId, sourceLabel);
                 continue;
             }
             if (start < 0 || end <= start) {
-                log.debug("pii-detect requestId={} source={} invalid_offsets start={} end={} -> skipping", requestId, sourceLabel, start, end);
                 continue;
             }
 
-            // Validate value matches CHARACTER substring first. If mismatch, attempt small heuristics, otherwise skip.
-            int[] offsets = validateCharacterOffsets(requestId, sourceLabel, sourceText, type, value, start, end);
+            int[] offsets = validateCharacterOffsets(sourceText, value, start, end);
+
             if (offsets == null) {
-                // Try heuristic recovery for truncated amount/currency (safe, narrow rule)
+                List<int[]> recoveredSpans = recoverSpansBySearchingValue(sourceText, value);
+                if (!recoveredSpans.isEmpty()) {
+                    for (int[] span : recoveredSpans) {
+                        items.add(new SensitiveDataItem(type, value, sourceLabel, span[0], span[1]));
+                    }
+                    continue;
+                }
+
                 int[] recovered = tryRecoverCommonTruncatedSpan(sourceText, value, start, end);
                 if (recovered != null) {
-                    log.debug("pii-detect requestId={} source={} heuristic_recovered type={} origStart={} origEnd={} newStart={} newEnd={}",
-                            requestId, sourceLabel, type, start, end, recovered[0], recovered[1]);
-                    offsets = recovered;
-                } else {
-                    log.debug("pii-detect requestId={} source={} value_mismatch type={} start={} end={} -> skipping", requestId, sourceLabel, type, start, end);
-                    continue; // skip this entity — don't fail whole source
+                    items.add(new SensitiveDataItem(type, sourceText.substring(recovered[0], recovered[1]), sourceLabel, recovered[0], recovered[1]));
+                    continue;
                 }
+                continue;
             }
 
-            // Add validated item
             items.add(new SensitiveDataItem(type, value, sourceLabel, offsets[0], offsets[1]));
         }
-
-        // After loop building 'items'
-        // Duplicate span expansion (LLM may only return one occurrence)
         items = expandDuplicateSpans(sourceText, items);
-
-        // De-duplicate exact spans after expansion
         items = dedupeBySpanKey(items);
-
-        // Resolve overlaps deterministically per source (longest-first, then start asc)
         return resolveOverlaps(items);
     }
 
-    /**
-     * Duplicate span expansion: for each item value, find all literal occurrences and emit a span for each.
-     * Uses character-based indexOf.
-     */
+    private String stripMarkdownCodeFences(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.startsWith("```")) {
+            int firstLineEnd = t.indexOf('\n');
+            if (firstLineEnd > 0) {
+                t = t.substring(firstLineEnd + 1);
+            } else {
+                t = t.substring(3);
+            }
+            int endFence = t.lastIndexOf("```");
+            if (endFence >= 0) {
+                t = t.substring(0, endFence);
+            }
+            return t.trim();
+        }
+        return s;
+    }
+
+    private List<int[]> recoverSpansBySearchingValue(String sourceText, String value) {
+        if (sourceText == null || sourceText.isEmpty()) return List.of();
+        if (value == null || value.isEmpty()) return List.of();
+        List<int[]> spans = new ArrayList<>();
+        int from = 0;
+        while (from <= sourceText.length()) {
+            int idx = sourceText.indexOf(value, from);
+            if (idx < 0) break;
+            spans.add(new int[]{idx, idx + value.length()});
+            from = idx + 1;
+        }
+        return spans;
+    }
+
     private List<SensitiveDataItem> expandDuplicateSpans(String sourceText, List<SensitiveDataItem> items) {
         if (items == null || items.isEmpty()) return items;
         List<SensitiveDataItem> expanded = new ArrayList<>();
         for (SensitiveDataItem item : items) {
             String value = item.getValue();
             if (value == null || value.isEmpty() || sourceText == null || sourceText.isEmpty()) {
-                // fallback: keep original
                 expanded.add(item);
                 continue;
             }
+
             int from = 0;
             while (from <= sourceText.length()) {
                 int idx = sourceText.indexOf(value, from);
                 if (idx < 0) break;
+
                 int end = idx + value.length();
                 expanded.add(new SensitiveDataItem(item.getType(), value, item.getSource(), idx, end));
-                from = idx + 1; // allow overlapping occurrences
+                from = idx + 1;
             }
         }
         return expanded;
     }
 
-    /** De-duplicate by (type, source, start, end). */
     private List<SensitiveDataItem> dedupeBySpanKey(List<SensitiveDataItem> items) {
         if (items == null || items.isEmpty()) return items;
         Set<String> seen = new HashSet<>(items.size() * 2);
@@ -289,18 +280,7 @@ public class PiiDetectService {
         return out;
     }
 
-    /**
-     * Strict character-offset validation.
-     * Returns validated [start,end] if and only if value == sourceText.substring(start,end).
-     */
-    private int[] validateCharacterOffsets(String requestId,
-                                          String sourceLabel,
-                                          String sourceText,
-                                          String type,
-                                          String value,
-                                          int start,
-                                          int end) {
-        // requestId is included for uniform logging context in callers (kept intentionally even if not always used).
+    private int[] validateCharacterOffsets(String sourceText, String value, int start, int end) {
         try {
             if (sourceText == null) return null;
             if (start < 0 || end < 0 || start >= end) return null;
@@ -308,42 +288,28 @@ public class PiiDetectService {
 
             String extracted = sourceText.substring(start, end);
             if (!extracted.equals(value)) {
-                // Don't log raw values in production; only debug with redaction (lengths only).
-                log.debug("pii-detect stage={} value_mismatch type={} start={} end={} extractedLen={} valueLen={}",
-                        sourceLabel, type, start, end,
-                        extracted.length(),
-                        value == null ? 0 : value.length());
                 return null;
             }
             return new int[]{start, end};
         } catch (Exception e) {
-            log.debug("pii-detect stage={} invalid_offsets type={} start={} end={} err={}", sourceLabel, type, start, end, e.toString());
             return null;
         }
     }
 
-    /**
-     * Heuristic: if the model returned a numeric value and the source text immediately after end contains
-     * a currency suffix like " LKR" or " USD" or " EUR" (2-4 uppercase letters), expand the end to include it.
-     * Returns new [start,end] (character offsets) or null.
-     */
     private int[] tryRecoverCommonTruncatedSpan(String sourceText, String value, int start, int end) {
         if (sourceText == null || value == null) return null;
-        // narrow: only for numeric-ish values (digits, maybe commas/dots)
         if (!value.matches("^[0-9]{2,}(?:[.,][0-9]{2,})?$")) return null;
 
-        // look ahead up to 8 characters for " SPACE + 2-4 letters"
         int lookStart = Math.max(0, end);
         int lookEnd = Math.min(sourceText.length(), end + 8);
         if (lookStart >= lookEnd) return null;
         String tail = sourceText.substring(lookStart, lookEnd);
 
-        // match patterns like " LKR", " USD", " EUR"
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s+([A-Z]{2,4})\\b").matcher(tail);
         if (m.find()) {
-            int newEnd = end + m.end(); // extend end to include the currency suffix
+            int newEnd = end + m.end();
             if (newEnd > sourceText.length()) return null;
-            // sanity check: ensure substring equals value + " " + currency (approx)
+
             String candidate = sourceText.substring(start, newEnd);
             if (candidate.startsWith(value) && candidate.length() > value.length()) {
                 return new int[]{start, newEnd};
@@ -352,11 +318,9 @@ public class PiiDetectService {
         return null;
     }
 
-
     private List<SensitiveDataItem> resolveOverlaps(List<SensitiveDataItem> items) {
         if (items.isEmpty()) return items;
 
-        // longest-first then start asc -> deterministic
         List<SensitiveDataItem> sorted = new ArrayList<>(items);
         sorted.sort(Comparator
                 .<SensitiveDataItem>comparingInt(i -> (i.getEnd() - i.getStart())).reversed()
@@ -375,7 +339,6 @@ public class PiiDetectService {
             if (!overlaps) chosen.add(cand);
         }
 
-        // Return in ascending start order (more natural)
         chosen.sort(Comparator.comparingInt(SensitiveDataItem::getStart));
         return chosen;
     }
@@ -398,7 +361,7 @@ public class PiiDetectService {
         }
         return null;
     }
+
+    private record ParseResult(boolean failed, String errorCode, List<SensitiveDataItem> items) {
+    }
 }
-
-
-

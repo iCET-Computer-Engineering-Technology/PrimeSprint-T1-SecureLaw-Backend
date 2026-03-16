@@ -3,8 +3,6 @@ package com.primesprint.pii.util;
 import java.util.Set;
 
 public final class AllowedTypes {
-    private AllowedTypes() {}
-
     private static final Set<String> ALLOWED = Set.of(
             "PERSON",
             "ORGANIZATION",
@@ -21,6 +19,9 @@ public final class AllowedTypes {
             "EVIDENCE_ID",
             "AMOUNT"
     );
+
+    private AllowedTypes() {
+    }
 
     public static boolean isAllowed(String type) {
         return type != null && ALLOWED.contains(type);
