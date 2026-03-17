@@ -28,6 +28,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // Allow CORS preflight
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/audit/**").permitAll()
+                        .requestMatchers("/audit/test/**").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("SENIOR")
                         .requestMatchers("/api/user/**").hasAnyRole("SENIOR", "JUNIOR")
