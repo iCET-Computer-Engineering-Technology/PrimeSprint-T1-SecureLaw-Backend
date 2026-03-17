@@ -3,23 +3,29 @@ spring:
     import: optional:file:.env[.properties]
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/auditdb
-    username: postgres
+    url: ${DB_URL}
+    username: ${DB_USER}
     password: ${DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
-
     hikari:
       maximum-pool-size: 10
+    driver-class-name: org.postgresql.Driver
 
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    baseline-on-migrate: true
 
-  logging:
-    level:
-      org.flywaydb: DEBUG
+server:
+  port: ${PORT:8080}
 
-  server:
-    port: 8080
-
-
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      cors:
+        allowed-origins: http://localhost:4200,https://prime-sprint-t1-secure-la-git-22a7c7-theekshana-nuwans-projects.vercel.app,https://securelaw.vercel.app,https://preview-securelaw.vercel.app
+        allowed-methods: GET,OPTIONS
+        allow-credentials: true
+  endpoint:
+    health:
+      show-details: never
