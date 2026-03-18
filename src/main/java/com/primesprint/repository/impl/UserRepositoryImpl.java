@@ -17,7 +17,6 @@ public class UserRepositoryImpl implements UserRepository {
 
     @Override
     public User findByUsernameOrEmail(String usernameOrEmail) {
-
         String sql = """
                 SELECT u.id, u.username, u.email, u.password, u.status,u.created_at,
                        u.updated_at,

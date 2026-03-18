@@ -1,4 +1,4 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,5 +12,4 @@ public class LoginResponse {
     private String token;
     private Instant expiresAt;
     private String role;
-
 }

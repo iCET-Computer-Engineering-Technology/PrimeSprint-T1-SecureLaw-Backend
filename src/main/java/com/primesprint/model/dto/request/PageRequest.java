@@ -1,4 +1,4 @@
-package com.primesprint.dto;
+package com.primesprint.model.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,7 +9,9 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class UploadResponse {
-    private String uploadId;
-    private String textPreview;
+public class PageRequest {
+    private int page;
+    private int size;
+    private String sort;
+    private String direction;
 }
