@@ -3,7 +3,7 @@ import com.primesprint.dto.UploadResponse;
 import com.primesprint.service.FileService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
+@CrossOrigin("*")
 @RestController
 @RequestMapping("/api")
 public class UploadController {
