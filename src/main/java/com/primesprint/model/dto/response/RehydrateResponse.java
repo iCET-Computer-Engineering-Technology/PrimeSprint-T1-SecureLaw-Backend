@@ -1,23 +1,23 @@
 package com.primesprint.model.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Getter
+@Setter
 public class RehydrateResponse {
     private UUID mappingId;
     private String finalText;
-    private ArrayList<Warning> warnings;
+    private List<Warning> warnings;
 
     @AllArgsConstructor
     @NoArgsConstructor
-    @Data
+    @Getter
+    @Setter
     public static class Warning{
         private String type;
         private String token;
