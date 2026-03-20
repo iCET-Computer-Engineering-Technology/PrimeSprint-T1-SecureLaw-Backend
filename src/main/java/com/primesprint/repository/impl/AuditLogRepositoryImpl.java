@@ -1,6 +1,8 @@
 package com.primesprint.repository.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.dto.PIIDailyCount;
+import com.primesprint.enums.ActionType;
 import com.primesprint.mapper.AuditLogRowMapper;
 import com.primesprint.model.AuditLog;
 import com.primesprint.repository.AuditLogRepository;
@@ -8,8 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import tools.jackson.databind.ObjectMapper;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,7 +23,7 @@ public class AuditLogRepositoryImpl implements AuditLogRepository {
     private final ObjectMapper objectMapper;
 
     @Override
-    public void insertAuditLog(AuditLog log) throws SQLException {
+    public void insertAuditLog(AuditLog log) throws SQLException, JsonProcessingException {
 
         String sql = """
             INSERT INTO audit_log
@@ -112,6 +113,28 @@ public class AuditLogRepositoryImpl implements AuditLogRepository {
                         rs.getDate("day").toLocalDate(),
                         rs.getInt("total")
                 )
+        );
+    }
+
+    @Override
+    public List<AuditLog> findByAction(ActionType action) throws SQLException {
+        String sql = "SELECT * FROM audit_log WHERE action = ?";
+        return jdbcTemplate.query(
+                sql,
+                new AuditLogRowMapper(),
+                action.name()
+        );
+    }
+
+    @Override
+    public List<AuditLog> findSystemLogs() throws SQLException {
+        String sql = """
+                SELECT *
+                FROM audit_log
+                WHERE action::text NOT LIKE 'AI_%'""";
+        return jdbcTemplate.query(
+                sql,
+                new AuditLogRowMapper()
         );
     }
 }

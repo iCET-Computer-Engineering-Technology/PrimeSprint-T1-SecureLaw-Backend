@@ -2,7 +2,6 @@ package com.primesprint.dto;
 
 import com.primesprint.enums.ActionType;
 import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -12,7 +11,7 @@ import java.util.Map;
 @NoArgsConstructor
 @ToString
 @Builder
-public class AuditLogdto {
+public class AuditLogDto {
 
     private String userId;
     private LocalDateTime timestamp;

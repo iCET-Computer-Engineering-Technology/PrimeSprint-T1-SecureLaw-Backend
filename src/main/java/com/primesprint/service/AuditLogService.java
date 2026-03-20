@@ -1,8 +1,11 @@
 package com.primesprint.service;
 
 
-import com.primesprint.dto.AuditLogdto;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.primesprint.dto.AuditLogDto;
+import com.primesprint.dto.AuditLogDto;
 import com.primesprint.dto.PIIDailyCount;
+import com.primesprint.enums.ActionType;
 import com.primesprint.model.AuditLog;
 
 import java.sql.SQLException;
@@ -11,15 +14,19 @@ import java.util.List;
 
 public interface AuditLogService {
 
-    public List<AuditLogdto> getAll() throws SQLException;
+    public List<AuditLogDto> getAll() throws SQLException;
 
-    public List<AuditLogdto> searchByUserId(String id) throws SQLException;
+    public List<AuditLogDto> searchByUserId(String id) throws SQLException;
 
-    public List<AuditLogdto> searchByDateRange(LocalDate startDate, LocalDate endDate) throws SQLException;
+    public List<AuditLogDto> searchByDateRange(LocalDate startDate, LocalDate endDate) throws SQLException;
 
-    public List<AuditLogdto> searchByDateRangeForUser(LocalDate startDate, LocalDate endDate, String userId) throws SQLException;
+    public List<AuditLogDto> searchByDateRangeForUser(LocalDate startDate, LocalDate endDate, String userId) throws SQLException;
 
-    public void recordAuditLog(AuditLog log) throws SQLException;
+    public void recordAuditLog(AuditLog log) throws SQLException, JsonProcessingException;
 
     public List<PIIDailyCount> getPiiBlockedPerDay();
+
+    public List<AuditLogDto> searchByAction(ActionType action) throws SQLException;
+
+    public List<AuditLogDto> searchSystemLogs() throws SQLException;
 }

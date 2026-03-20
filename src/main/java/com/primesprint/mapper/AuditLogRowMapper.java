@@ -3,9 +3,8 @@ package com.primesprint.mapper;
 import com.primesprint.enums.ActionType;
 import com.primesprint.model.AuditLog;
 import org.springframework.jdbc.core.RowMapper;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -39,7 +38,7 @@ public class AuditLogRowMapper implements RowMapper<AuditLog> {
                     rs.getString("template_id"),
                     maskCounts,
                     rs.getString("model_used"),
-                    rs.getLong("response_time"),
+                    rs.getObject("response_time",Long.class),
                     rs.getString("details")
             );
 

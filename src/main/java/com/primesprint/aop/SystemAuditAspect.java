@@ -1,5 +1,6 @@
 package com.primesprint.aop;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.enums.ActionType;
 import com.primesprint.model.AuditLog;
@@ -8,9 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -19,13 +20,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SystemAuditAspect {
     private final AuditLogService auditService;
+    private static final Logger LOGGER = LoggerFactory.getLogger(SystemAuditAspect.class);
 
     @AfterReturning(value = "@annotation(auditable)")
-    public void logSystemAudit(JoinPoint joinPoint, Auditable auditable) throws SQLException{
+    public void logSystemAudit(JoinPoint joinPoint, Auditable auditable){
 
         ActionType action = auditable.action();
 
-        String userId = "AdminORUser"; //Should come from logging service
+        String userId = "AdminORUser"; //Hardcoded value : Should come from logging service
 
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName(); //Annotated method name
@@ -45,6 +47,10 @@ public class SystemAuditAspect {
                 .details(userId + " executed " + methodName)
                 .build();
 
-        auditService.recordAuditLog(log);
+        try {
+            auditService.recordAuditLog(log);
+        } catch (Exception e) {
+            LOGGER.error("Failed to record system audit log", e);
+        }
     }
 }
