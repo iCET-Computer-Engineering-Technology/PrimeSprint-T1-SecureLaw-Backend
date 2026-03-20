@@ -1,10 +1,10 @@
 package com.primesprint.service;
 
 import com.primesprint.mapper.UserMapper;
-import com.primesprint.model.dto.LoginRequest;
-import com.primesprint.model.dto.LoginResponse;
-import com.primesprint.model.dto.RegisterRequest;
 import com.primesprint.model.dto.UserDto;
+import com.primesprint.model.dto.request.LoginRequest;
+import com.primesprint.model.dto.request.RegisterRequest;
+import com.primesprint.model.dto.response.LoginResponse;
 import com.primesprint.model.entity.User;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.repository.UserRepository;
@@ -95,6 +95,20 @@ public class AuthService {
                     "User not found"
             );
         }
+        return userMapper.toDto(user);
+    }
+
+    public UserDto getUserByUsername(String username) {
+
+        User user = userRepository.findByUsernameOrEmail(username);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User not found"
+            );
+        }
+
         return userMapper.toDto(user);
     }
 }

@@ -1,12 +1,10 @@
-package com.primesprint.model.dto;
+package com.primesprint.model.dto.request;
 
 import com.primesprint.model.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.UUID;
 
 @Getter
 @Setter
