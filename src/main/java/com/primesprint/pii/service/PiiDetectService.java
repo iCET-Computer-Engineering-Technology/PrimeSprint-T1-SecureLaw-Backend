@@ -150,75 +150,16 @@ public class PiiDetectService {
         //    PHONE/CARD_NUMBER must never be represented as BANK_ACCOUNT.
         combined = enforceStrictTypeSeparationPerSource(combined);
 
-        // 4) Normalize values for final output (POST-classification) and use the same normalization for dedupe.
-        combined = normalizeValuesForOutput(combined);
-
-        // 5) Production dedupe: (type + normalizedValue + source) keep ONLY the first occurrence.
-        combined = dedupeByNormalizedValuePerSource(combined);
+        // IMPORTANT (masking contract): Never modify detected values in the API response.
+        // We only remove exact duplicate spans; distinct positions must always survive.
 
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
         log.info("pii-detect requestId={} stage=done totalItems={} ms={}", requestId, combined.size(), ms);
         return combined;
     }
 
-    /**
-     * Production dedupe requirement:
-     * De-duplicate per source by (type + normalizedValue + source) and keep only the FIRST occurrence.
-     * Offsets and the original value are preserved for kept entities.
-     */
-    private List<SensitiveDataItem> dedupeByNormalizedValuePerSource(List<SensitiveDataItem> items) {
-        if (items == null || items.isEmpty()) return items;
-
-        // Deterministic order: preserve incoming order, which is already stable.
-        // resolveOverlapsPerSource sorts by source,start,end.
-        Set<String> seen = new HashSet<>(items.size() * 2);
-        List<SensitiveDataItem> out = new ArrayList<>(items.size());
-        for (SensitiveDataItem i : items) {
-            if (i == null) continue;
-            String type = i.getType();
-            String src = i.getSource();
-            String norm = normalizeForDedupe(type, i.getValue());
-            String key = (type == null ? "" : type) + "|" + (src == null ? "" : src) + "|" + norm;
-            if (seen.add(key)) {
-                out.add(i);
-            }
-        }
-        return out;
-    }
-
-    private String normalizeForDedupe(String type, String value) {
-        if (value == null) return "";
-        String t = type == null ? "" : type;
-        String v = value.trim();
-
-        // Emails => lowercase
-        if ("EMAIL".equals(t)) {
-            return v.toLowerCase(Locale.ROOT);
-        }
-
-        // Phone => remove spaces/dashes/parentheses (keep leading '+')
-        if ("PHONE".equals(t)) {
-            return normalizePhone(v);
-        }
-
-        // Card/bank => digits only (stable)
-        if (TYPE_CARD_NUMBER.equals(t) || TYPE_BANK_ACCOUNT.equals(t)) {
-            return digitsOnly(v);
-        }
-
-        // Amount => canonical currency + normalized decimal for consistent output + dedupe.
-        if (TYPE_AMOUNT.equals(t)) {
-            return normalizeAmountCanonical(v);
-        }
-
-        // Person/org => trim + collapse whitespace + lowercase (case-insensitive)
-        if ("PERSON".equals(t) || "ORGANIZATION".equals(t)) {
-            return normalizeWordsLower(v);
-        }
-
-        // Default: trim + lowercase and collapse whitespace
-        return normalizeWordsLower(v);
-    }
+    // NOTE: Internal normalization helpers are intentionally kept for comparison/classification only.
+    // They MUST NOT be used to mutate values returned in the API response.
 
     private String digitsOnly(String s) {
         if (s == null || s.isEmpty()) return "";
@@ -292,12 +233,12 @@ public class PiiDetectService {
                 }
 
                 List<SensitiveDataItem> items = parseGroqResponseToItems(requestId, raw, text, source);
-                // Merge deterministic + LLM items, then dedupe/overlap resolution.
+
+                // Merge deterministic + LLM items, then enforce the strict order:
+                // merge -> expandDuplicateSpans -> dedupeBySpanKey -> resolveOverlaps.
                 List<SensitiveDataItem> merged = new ArrayList<>(deterministic.size() + items.size());
                 merged.addAll(deterministic);
                 merged.addAll(items);
-                // Expand duplicates after merging so we don't miss deterministic-only values
-                // and so both deterministic + LLM contributions are fully expanded.
                 merged = expandDuplicateSpans(text, merged);
                 merged = dedupeBySpanKey(merged);
                 merged = resolveOverlapsPerSource(merged);
@@ -323,6 +264,7 @@ public class PiiDetectService {
         merged = resolveOverlapsPerSource(merged);
         return ParseResult.ok(merged);
     }
+
 
     private List<SensitiveDataItem> parseGroqResponseToItems(String requestId,
                                                              String groqResponseJson,
@@ -487,11 +429,6 @@ public class PiiDetectService {
     }
 
 
-    private String digitsOnlyPreserveLeadingPlus(String s) {
-        // normalizePhone already implements our desired behavior.
-        return normalizePhone(s);
-    }
-
     private int countDigits(String s) {
         if (s == null || s.isEmpty()) return 0;
         int cnt = 0;
@@ -510,7 +447,7 @@ public class PiiDetectService {
         String t = raw.trim();
         boolean cue = t.startsWith("+") || t.contains("(") || t.contains(")") || t.contains("-") || t.contains(" ");
         if (!cue) return false;
-        String norm = digitsOnlyPreserveLeadingPlus(t);
+        String norm = normalizePhone(t);
         int digits = countDigits(norm);
         return digits >= 7 && digits <= 15;
     }
@@ -603,50 +540,8 @@ public class PiiDetectService {
         return shouldDrop ? List.of() : List.of(item);
     }
 
-    /**
-     * Normalizes values for FINAL output (post-classification).
-     * The normalized value is also used for deduplication.
-     */
-    private List<SensitiveDataItem> normalizeValuesForOutput(List<SensitiveDataItem> items) {
-        if (items == null || items.isEmpty()) return items;
-        List<SensitiveDataItem> out = new ArrayList<>(items.size());
-        for (SensitiveDataItem i : items) {
-            if (i == null) continue;
-            out.add(normalizeValueForOutput(i));
-        }
-        return out;
-    }
-
-    private SensitiveDataItem normalizeValueForOutput(SensitiveDataItem item) {
-        if (item == null) return null;
-        String type = item.getType();
-        String v = item.getValue();
-        if (v == null) return item;
-
-        String norm;
-        if ("EMAIL".equals(type)) {
-            norm = v.trim().toLowerCase(Locale.ROOT);
-        } else if ("PHONE".equals(type)) {
-            norm = digitsOnlyPreserveLeadingPlus(v);
-        } else if (TYPE_CARD_NUMBER.equals(type)) {
-            norm = digitsOnly(v);
-        } else if (TYPE_BANK_ACCOUNT.equals(type)) {
-            String compact = v.trim().replaceAll("\\s+", "");
-            if (looksLikeIbanValue(compact)) {
-                norm = compact.toUpperCase(Locale.ROOT);
-            } else {
-                norm = digitsOnly(v);
-            }
-        } else if (TYPE_AMOUNT.equals(type)) {
-            norm = normalizeAmountCanonical(v);
-        } else {
-            // Default: whitespace normalization only.
-            norm = collapseWhitespace(v).trim();
-        }
-
-        if (norm.equals(v)) return item;
-        return new SensitiveDataItem(type, norm, item.getSource(), item.getStart(), item.getEnd());
-    }
+    // NOTE: Output normalization intentionally removed.
+    // Masking/redaction requires preserving exact original substrings (casing/formatting).
 
     /**
      * Canonical AMOUNT normalization.
