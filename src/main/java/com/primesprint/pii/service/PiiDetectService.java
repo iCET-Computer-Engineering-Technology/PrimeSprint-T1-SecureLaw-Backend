@@ -273,7 +273,9 @@ public class PiiDetectService {
         // Offsets are character offsets derived from Matcher.start()/end().
         List<SensitiveDataItem> deterministic = extractStructuredEntities(source, text);
 
-        log.info("pii-detect requestId={} source={} stage=start textLen={} deterministicCount={}",
+        // Noise control: keep high-signal warnings/errors and final summary at INFO.
+        // Start/parse telemetry remains available at DEBUG for troubleshooting.
+        log.debug("pii-detect requestId={} source={} stage=start textLen={} deterministicCount={}",
                 requestId, source, text.length(), deterministic.size());
 
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -354,7 +356,7 @@ public class PiiDetectService {
         // Doing it here would miss deterministic-only values and can cause inconsistent behavior.
 
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-        log.info("pii-detect requestId={} source={} stage=parsed items={} skippedNodes={} ms={}",
+        log.debug("pii-detect requestId={} source={} stage=parsed items={} skippedNodes={} ms={}",
                 requestId, sourceLabel, items.size(), skipped, ms);
 
         return items;
