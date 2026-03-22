@@ -142,10 +142,108 @@ public class PiiDetectService {
 
         combined = dedupeBySpanKey(combined);
         combined = resolveOverlapsPerSource(combined);
+        combined = dedupeByNormalizedValuePerSource(combined);
 
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
         log.info("pii-detect requestId={} stage=done totalItems={} ms={}", requestId, combined.size(), ms);
         return combined;
+    }
+
+    /**
+     * Production dedupe requirement:
+     * De-duplicate per source by (type + normalizedValue + source) and keep only the FIRST occurrence.
+     * Offsets and the original value are preserved for kept entities.
+     */
+    private List<SensitiveDataItem> dedupeByNormalizedValuePerSource(List<SensitiveDataItem> items) {
+        if (items == null || items.isEmpty()) return items;
+
+        // Deterministic order: preserve incoming order, which is already stable.
+        // resolveOverlapsPerSource sorts by source,start,end.
+        Set<String> seen = new HashSet<>(items.size() * 2);
+        List<SensitiveDataItem> out = new ArrayList<>(items.size());
+        for (SensitiveDataItem i : items) {
+            if (i == null) continue;
+            String type = i.getType();
+            String src = i.getSource();
+            String norm = normalizeForDedupe(type, i.getValue());
+            String key = (type == null ? "" : type) + "|" + (src == null ? "" : src) + "|" + norm;
+            if (seen.add(key)) {
+                out.add(i);
+            }
+        }
+        return out;
+    }
+
+    private String normalizeForDedupe(String type, String value) {
+        if (value == null) return "";
+        String t = type == null ? "" : type;
+        String v = value.trim();
+
+        // Emails => lowercase
+        if ("EMAIL".equals(t)) {
+            return v.toLowerCase(Locale.ROOT);
+        }
+
+        // Phone => remove spaces/dashes/parentheses (keep leading '+')
+        if ("PHONE".equals(t)) {
+            return normalizePhone(v);
+        }
+
+        // Card/bank => digits only (stable)
+        if (TYPE_CARD_NUMBER.equals(t) || TYPE_BANK_ACCOUNT.equals(t)) {
+            return digitsOnly(v);
+        }
+
+        // Person/org => trim + collapse whitespace + lowercase (case-insensitive)
+        if ("PERSON".equals(t) || "ORGANIZATION".equals(t)) {
+            return normalizeWordsLower(v);
+        }
+
+        // Default: trim + lowercase and collapse whitespace
+        return normalizeWordsLower(v);
+    }
+
+    private String digitsOnly(String s) {
+        if (s == null || s.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isDigit(c)) sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    private String normalizePhone(String s) {
+        if (s == null || s.isEmpty()) return "";
+        String trimmed = s.trim();
+        StringBuilder sb = new StringBuilder(trimmed.length());
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (Character.isDigit(c)) {
+                sb.append(c);
+            } else if (c == '+' && sb.length() == 0) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private String normalizeWordsLower(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        boolean prevWs = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ws = Character.isWhitespace(c);
+            if (ws) {
+                if (!prevWs) sb.append(' ');
+                prevWs = true;
+            } else {
+                sb.append(Character.toLowerCase(c));
+                prevWs = false;
+            }
+        }
+        return sb.toString().trim();
     }
 
     private ParseResult callParseValidateWithRetry(String requestId, String source, String text) {
@@ -167,7 +265,11 @@ public class PiiDetectService {
                 if (raw == null) {
                     // LLM failed; still return deterministic results as best-effort.
                     log.warn("pii-detect requestId={} source={} stage=llm_null_response -> using_deterministic_only", requestId, source);
-                    return ParseResult.ok(resolveOverlapsPerSource(dedupeBySpanKey(deterministic)));
+                    List<SensitiveDataItem> merged = new ArrayList<>(deterministic);
+                    merged = expandDuplicateSpans(text, merged);
+                    merged = dedupeBySpanKey(merged);
+                    merged = resolveOverlapsPerSource(merged);
+                    return ParseResult.ok(merged);
                 }
 
                 List<SensitiveDataItem> items = parseGroqResponseToItems(requestId, raw, text, source);
@@ -175,6 +277,9 @@ public class PiiDetectService {
                 List<SensitiveDataItem> merged = new ArrayList<>(deterministic.size() + items.size());
                 merged.addAll(deterministic);
                 merged.addAll(items);
+                // Expand duplicates after merging so we don't miss deterministic-only values
+                // and so both deterministic + LLM contributions are fully expanded.
+                merged = expandDuplicateSpans(text, merged);
                 merged = dedupeBySpanKey(merged);
                 merged = resolveOverlapsPerSource(merged);
                 return ParseResult.ok(merged);
@@ -193,7 +298,11 @@ public class PiiDetectService {
 
         // LLM retries exhausted; still return deterministic results as best-effort.
         log.warn("pii-detect requestId={} source={} stage=retries_exhausted -> using_deterministic_only", requestId, source);
-        return ParseResult.ok(resolveOverlapsPerSource(dedupeBySpanKey(deterministic)));
+        List<SensitiveDataItem> merged = new ArrayList<>(deterministic);
+        merged = expandDuplicateSpans(text, merged);
+        merged = dedupeBySpanKey(merged);
+        merged = resolveOverlapsPerSource(merged);
+        return ParseResult.ok(merged);
     }
 
     private List<SensitiveDataItem> parseGroqResponseToItems(String requestId,
@@ -231,16 +340,14 @@ public class PiiDetectService {
         // are more consistent with bank account identifiers in our domain.
         items = relabelDigitOnlyCardNumbers(items);
 
-        // Duplicate expansion happens here: LLM often returns only one occurrence even if the
-        // same sensitive value appears multiple times.
-        items = expandDuplicateSpans(sourceText, items);
-        items = dedupeBySpanKey(items);
+        // NOTE: duplicate expansion is applied after merging deterministic + LLM results.
+        // Doing it here would miss deterministic-only values and can cause inconsistent behavior.
 
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
         log.info("pii-detect requestId={} source={} stage=parsed items={} skippedNodes={} ms={}",
                 requestId, sourceLabel, items.size(), skipped, ms);
 
-        return resolveOverlapsPerSource(items);
+        return items;
     }
 
     private String extractGroqContentBestEffort(String groqResponseJson) {
@@ -437,14 +544,31 @@ public class PiiDetectService {
                 continue;
             }
 
-            int from = 0;
-            while (from <= sourceText.length()) {
-                int idx = sourceText.indexOf(value, from);
-                if (idx < 0) break;
+            // Regex-based literal matching prevents partial/embedded mismatches and keeps matching exact.
+            Pattern p;
+            try {
+                p = Pattern.compile(Pattern.quote(value));
+            } catch (Exception ex) {
+                // If regex compilation fails for some unexpected reason, fall back to the original item.
+                expanded.add(item);
+                continue;
+            }
 
-                int end = idx + value.length();
-                expanded.add(new SensitiveDataItem(item.getType(), value, item.getSource(), idx, end));
-                from = idx + 1;
+            Matcher m = p.matcher(sourceText);
+            boolean found = false;
+            while (m.find()) {
+                found = true;
+                int s = m.start();
+                int e = m.end();
+                // Strict contract: value must equal substring for these offsets.
+                if (isValidOffsets(sourceText, value, s, e)) {
+                    expanded.add(new SensitiveDataItem(item.getType(), value, item.getSource(), s, e));
+                }
+            }
+
+            // If no match found at all, preserve the original item so we don't silently drop it.
+            if (!found) {
+                expanded.add(item);
             }
         }
         return expanded;
@@ -495,6 +619,9 @@ public class PiiDetectService {
         if (text == null || text.isBlank()) return List.of();
 
         List<SensitiveDataItem> out = new ArrayList<>();
+        out.addAll(detectCaseIds(sourceLabel, text));
+        out.addAll(detectEvidenceIds(sourceLabel, text));
+        out.addAll(detectPassports(sourceLabel, text));
         out.addAll(detectAmounts(sourceLabel, text));
         out.addAll(detectNationalIds(sourceLabel, text));
         out.addAll(detectCardNumbers(sourceLabel, text));
@@ -502,9 +629,41 @@ public class PiiDetectService {
         // NOTE: no deterministic CONTRACT_REF fallback:
         // it was overly broad and could collide with CASE_ID/other refs. Keep this to LLM only.
 
-        // Keep deterministic output stable.
-        out = dedupeBySpanKey(out);
-        out = resolveOverlapsPerSource(out);
+        // Do not dedupe/overlap here: the main pipeline performs
+        // merge -> expandDuplicateSpans -> dedupe -> resolveOverlaps.
+        return out;
+    }
+
+    /**
+     * CASE_ID deterministic fallback (high confidence)
+     * Pattern: \b(?:DC|CR|HC)-\d{4}-\d{2,6}\b
+     */
+    private List<SensitiveDataItem> detectCaseIds(String sourceLabel, String text) {
+        Pattern p = Pattern.compile("\\b(?:DC|CR|HC)-\\d{4}-\\d{2,6}\\b");
+        List<SensitiveDataItem> out = new ArrayList<>();
+        findAllMatches(out, "CASE_ID", sourceLabel, text, p);
+        return out;
+    }
+
+    /**
+     * EVIDENCE_ID deterministic fallback (high confidence)
+     * Pattern: \bEV-\d{5,}\b
+     */
+    private List<SensitiveDataItem> detectEvidenceIds(String sourceLabel, String text) {
+        Pattern p = Pattern.compile("\\bEV-\\d{5,}\\b");
+        List<SensitiveDataItem> out = new ArrayList<>();
+        findAllMatches(out, "EVIDENCE_ID", sourceLabel, text, p);
+        return out;
+    }
+
+    /**
+     * PASSPORT deterministic fallback (high confidence)
+     * Pattern: \b[A-Z]\d{6,8}\b
+     */
+    private List<SensitiveDataItem> detectPassports(String sourceLabel, String text) {
+        Pattern p = Pattern.compile("\\b[A-Z]\\d{6,8}\\b");
+        List<SensitiveDataItem> out = new ArrayList<>();
+        findAllMatches(out, "PASSPORT", sourceLabel, text, p);
         return out;
     }
 
@@ -581,8 +740,10 @@ public class PiiDetectService {
         Pattern iban = Pattern.compile("\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b", Pattern.CASE_INSENSITIVE);
         findAllMatches(out, TYPE_BANK_ACCOUNT, sourceLabel, text, iban);
 
-        // Generic long account number: 10-18 digits (word boundaries)
-        Pattern digits = Pattern.compile("\\b\\d{10,18}\\b");
+        // Generic long account number: 10-18 digits (word boundaries), excluding 12-digit sequences.
+        // Rationale: 12-digit numbers are especially ambiguous (references/IDs) and must not be
+        // automatically treated as BANK_ACCOUNT.
+        Pattern digits = Pattern.compile("\\b(?:\\d{10,11}|\\d{13,18})\\b");
         findAllMatches(out, TYPE_BANK_ACCOUNT, sourceLabel, text, digits);
 
         return out;
@@ -641,10 +802,8 @@ public class PiiDetectService {
 
         // Overlap resolution policy (source-local, deterministic):
         // - Never dedupe identical spans: that's handled by dedupeBySpanKey.
-        // - If two entities overlap but represent different types, keep BOTH unless one is clearly
-        //   a lower-confidence reinterpretation of the same numeric span (e.g., BANK_ACCOUNT vs CARD_NUMBER).
-        // - If two entities overlap and have the same type, keep the one with higher priority;
-        //   if equal priority, keep the longer (more specific), then earlier start.
+        // - Keep different types unless this is a CARD_NUMBER vs BANK_ACCOUNT conflict.
+        // - For same-type conflicts, pick a single deterministic winner.
 
         List<SensitiveDataItem> sorted = new ArrayList<>(items);
         sorted.sort(Comparator
@@ -681,20 +840,18 @@ public class PiiDetectService {
         SensitiveDataItem toDrop = null;
         boolean rejectCand = false;
 
-        for (SensitiveDataItem existing : chosen) {
+        int i = 0;
+        int size = chosen.size();
+        while (i < size) {
+            SensitiveDataItem existing = chosen.get(i);
             boolean overlaps = rangesOverlap(cand.getStart(), cand.getEnd(), existing.getStart(), existing.getEnd());
-            if (!overlaps) {
-                continue;
+            if (overlaps) {
+                OverlapDecision d = decideOverlap(existing, cand);
+                rejectCand = rejectCand || (d == OverlapDecision.DROP_CANDIDATE);
+                boolean dropExisting = d == OverlapDecision.DROP_EXISTING;
+                toDrop = dropExisting ? existing : toDrop;
             }
-
-            OverlapDecision d = decideOverlap(existing, cand);
-            if (d == OverlapDecision.DROP_CANDIDATE) {
-                rejectCand = true;
-                break;
-            }
-            if (d == OverlapDecision.DROP_EXISTING) {
-                toDrop = existing;
-            }
+            i++;
         }
 
         return new OverlapEval(rejectCand, toDrop);
