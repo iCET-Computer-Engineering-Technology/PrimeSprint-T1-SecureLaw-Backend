@@ -8,6 +8,7 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
+    driver-class-name: org.postgresql.Driver
 
   flyway:
     enabled: true
@@ -15,6 +16,15 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+llm:
+  base-url: ${LLM_BASE_URL:https://api.groq.com/openai/v1}
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:llama-3.3-70b-versatile}
+  chat-endpoint: ${LLM_CHAT_ENDPOINT:/chat/completions}
+  timeout-ms: ${LLM_TIMEOUT_MS:120000}
+  max-retries: ${LLM_MAX_RETRIES:2}
+  retry-backoff-ms: ${LLM_RETRY_BACKOFF_MS:500}
 
 management:
   endpoints:
