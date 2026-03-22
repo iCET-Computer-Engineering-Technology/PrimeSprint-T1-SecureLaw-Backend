@@ -1,5 +1,6 @@
 package com.primesprint.pii.util;
 
+import java.util.Locale;
 import java.util.Set;
 
 public final class AllowedTypes {
@@ -21,6 +22,13 @@ public final class AllowedTypes {
     );
 
     private AllowedTypes() {
+    }
+
+    public static String canonicalize(String type) {
+        if (type == null) return null;
+        String t = type.trim();
+        if (t.isEmpty()) return null;
+        return t.toUpperCase(Locale.ROOT);
     }
 
     public static boolean isAllowed(String type) {
