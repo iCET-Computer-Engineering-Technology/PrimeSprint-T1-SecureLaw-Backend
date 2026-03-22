@@ -140,8 +140,20 @@ public class PiiDetectService {
         if (!docRes.failed) combined.addAll(docRes.items == null ? List.of() : docRes.items);
         if (!promptRes.failed) combined.addAll(promptRes.items == null ? List.of() : promptRes.items);
 
+        // 1) Remove exact duplicate spans (same type+source+start+end)
         combined = dedupeBySpanKey(combined);
+
+        // 2) Resolve overlaps within each source (type-aware, deterministic)
         combined = resolveOverlapsPerSource(combined);
+
+        // 3) Enforce strict separation rules for numeric-like categories.
+        //    PHONE/CARD_NUMBER must never be represented as BANK_ACCOUNT.
+        combined = enforceStrictTypeSeparationPerSource(combined);
+
+        // 4) Normalize values for final output (POST-classification) and use the same normalization for dedupe.
+        combined = normalizeValuesForOutput(combined);
+
+        // 5) Production dedupe: (type + normalizedValue + source) keep ONLY the first occurrence.
         combined = dedupeByNormalizedValuePerSource(combined);
 
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
@@ -192,6 +204,11 @@ public class PiiDetectService {
         // Card/bank => digits only (stable)
         if (TYPE_CARD_NUMBER.equals(t) || TYPE_BANK_ACCOUNT.equals(t)) {
             return digitsOnly(v);
+        }
+
+        // Amount => canonical currency + normalized decimal for consistent output + dedupe.
+        if (TYPE_AMOUNT.equals(t)) {
+            return normalizeAmountCanonical(v);
         }
 
         // Person/org => trim + collapse whitespace + lowercase (case-insensitive)
@@ -333,13 +350,6 @@ public class PiiDetectService {
             items.addAll(parsed.get());
         }
 
-        // Post-processing safeguard (LLM-aligned):
-        // If the LLM labels a plain digit-only long sequence as CARD_NUMBER, relabel to BANK_ACCOUNT.
-        // This does not change offsets or values; it only corrects the type.
-        // Rationale: card numbers are typically formatted with spaces/dashes; long unformatted digit sequences
-        // are more consistent with bank account identifiers in our domain.
-        items = relabelDigitOnlyCardNumbers(items);
-
         // NOTE: duplicate expansion is applied after merging deterministic + LLM results.
         // Doing it here would miss deterministic-only values and can cause inconsistent behavior.
 
@@ -474,31 +484,273 @@ public class PiiDetectService {
         return UUID.randomUUID().toString();
     }
 
-    private List<SensitiveDataItem> relabelDigitOnlyCardNumbers(List<SensitiveDataItem> items) {
+
+    private String digitsOnlyPreserveLeadingPlus(String s) {
+        // normalizePhone already implements our desired behavior.
+        return normalizePhone(s);
+    }
+
+    private int countDigits(String s) {
+        if (s == null || s.isEmpty()) return 0;
+        int cnt = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.isDigit(s.charAt(i))) cnt++;
+        }
+        return cnt;
+    }
+
+    /**
+     * Strict phone signal: requires an explicit formatting cue (e.g., +, spaces, dashes) and a realistic digit count.
+     * This avoids classifying arbitrary long digit strings as PHONE.
+     */
+    private boolean looksLikePhoneValue(String raw) {
+        if (raw == null) return false;
+        String t = raw.trim();
+        boolean cue = t.startsWith("+") || t.contains("(") || t.contains(")") || t.contains("-") || t.contains(" ");
+        if (!cue) return false;
+        String norm = digitsOnlyPreserveLeadingPlus(t);
+        int digits = countDigits(norm);
+        return digits >= 7 && digits <= 15;
+    }
+
+    /**
+     * Strict card signal: requires card-like formatting (spaces/dashes) and 13-19 digits.
+     * This prevents length-only classification of digit runs as card numbers.
+     */
+    private boolean looksLikeCardNumberValue(String raw) {
+        if (raw == null) return false;
+        String t = raw.trim();
+        boolean sep = t.indexOf(' ') >= 0 || t.indexOf('-') >= 0;
+        if (!sep) return false;
+        int digits = countDigits(t);
+        return digits >= 13 && digits <= 19;
+    }
+
+    private boolean looksLikeIbanValue(String raw) {
+        if (raw == null) return false;
+        String t = raw.trim();
+        return t.matches("(?i)^[A-Z]{2}\\d{2}[A-Z0-9]{10,30}$");
+    }
+
+    /**
+     * Enforces strict separation rules after overlap resolution but BEFORE normalization/dedup:
+     * - PHONE must never be represented as BANK_ACCOUNT
+     * - CARD_NUMBER must never be represented as BANK_ACCOUNT
+     * - Numeric values must not be retyped by length-only heuristics
+     */
+    private List<SensitiveDataItem> enforceStrictTypeSeparationPerSource(List<SensitiveDataItem> items) {
         if (items == null || items.isEmpty()) return items;
+        Map<String, List<SensitiveDataItem>> bySource = groupBySource(items);
+
         List<SensitiveDataItem> out = new ArrayList<>(items.size());
+        for (var e : bySource.entrySet()) {
+            out.addAll(enforceStrictTypeSeparationSingleSource(e.getValue()));
+        }
+        out.sort(sourceStableOrder());
+        return out;
+    }
+
+    private Map<String, List<SensitiveDataItem>> groupBySource(List<SensitiveDataItem> items) {
+        Map<String, List<SensitiveDataItem>> bySource = new LinkedHashMap<>();
         for (SensitiveDataItem i : items) {
             if (i == null) continue;
-            out.add(relabelDigitOnlyCardNumber(i));
+            bySource.computeIfAbsent(i.getSource(), k -> new ArrayList<>()).add(i);
+        }
+        return bySource;
+    }
+
+    private List<SensitiveDataItem> enforceStrictTypeSeparationSingleSource(List<SensitiveDataItem> srcItems) {
+        if (srcItems == null || srcItems.isEmpty()) return List.of();
+        List<SensitiveDataItem> src = new ArrayList<>(srcItems);
+        src.sort(Comparator.comparingInt(SensitiveDataItem::getStart)
+                .thenComparingInt(SensitiveDataItem::getEnd)
+                .thenComparing(i -> i.getType() == null ? "" : i.getType()));
+
+        Set<String> protectedBankConflicts = computeProtectedBankConflictSpans(src);
+
+        List<SensitiveDataItem> out = new ArrayList<>(src.size());
+        for (SensitiveDataItem i : src) {
+            if (i == null) continue;
+            out.addAll(filterBankAccountConflicts(i, protectedBankConflicts));
         }
         return out;
     }
 
-    private SensitiveDataItem relabelDigitOnlyCardNumber(SensitiveDataItem item) {
-        if (item == null) return null;
-        if (!TYPE_CARD_NUMBER.equals(item.getType())) return item;
-        String v = item.getValue();
-        if (v == null) return item;
-        if (!isAllDigits(v)) return item;
-        return new SensitiveDataItem(TYPE_BANK_ACCOUNT, v, item.getSource(), item.getStart(), item.getEnd());
+    private Set<String> computeProtectedBankConflictSpans(List<SensitiveDataItem> src) {
+        Set<String> spans = new HashSet<>();
+        for (SensitiveDataItem i : src) {
+            if (i == null) continue;
+            String spanKey = i.getStart() + "|" + i.getEnd();
+            if ("PHONE".equals(i.getType()) && looksLikePhoneValue(i.getValue())) {
+                spans.add(spanKey);
+            }
+            if (TYPE_CARD_NUMBER.equals(i.getType()) && looksLikeCardNumberValue(i.getValue())) {
+                spans.add(spanKey);
+            }
+        }
+        return spans;
     }
 
-    private boolean isAllDigits(String s) {
-        if (s == null || s.isEmpty()) return false;
-        for (int p = 0; p < s.length(); p++) {
-            if (!Character.isDigit(s.charAt(p))) return false;
+    private List<SensitiveDataItem> filterBankAccountConflicts(SensitiveDataItem item, Set<String> protectedBankConflicts) {
+        if (item == null) return List.of();
+        if (!TYPE_BANK_ACCOUNT.equals(item.getType())) return List.of(item);
+        String spanKey = item.getStart() + "|" + item.getEnd();
+        boolean shouldDrop = protectedBankConflicts.contains(spanKey)
+                || looksLikePhoneValue(item.getValue())
+                || looksLikeCardNumberValue(item.getValue());
+        return shouldDrop ? List.of() : List.of(item);
+    }
+
+    /**
+     * Normalizes values for FINAL output (post-classification).
+     * The normalized value is also used for deduplication.
+     */
+    private List<SensitiveDataItem> normalizeValuesForOutput(List<SensitiveDataItem> items) {
+        if (items == null || items.isEmpty()) return items;
+        List<SensitiveDataItem> out = new ArrayList<>(items.size());
+        for (SensitiveDataItem i : items) {
+            if (i == null) continue;
+            out.add(normalizeValueForOutput(i));
         }
-        return true;
+        return out;
+    }
+
+    private SensitiveDataItem normalizeValueForOutput(SensitiveDataItem item) {
+        if (item == null) return null;
+        String type = item.getType();
+        String v = item.getValue();
+        if (v == null) return item;
+
+        String norm;
+        if ("EMAIL".equals(type)) {
+            norm = v.trim().toLowerCase(Locale.ROOT);
+        } else if ("PHONE".equals(type)) {
+            norm = digitsOnlyPreserveLeadingPlus(v);
+        } else if (TYPE_CARD_NUMBER.equals(type)) {
+            norm = digitsOnly(v);
+        } else if (TYPE_BANK_ACCOUNT.equals(type)) {
+            String compact = v.trim().replaceAll("\\s+", "");
+            if (looksLikeIbanValue(compact)) {
+                norm = compact.toUpperCase(Locale.ROOT);
+            } else {
+                norm = digitsOnly(v);
+            }
+        } else if (TYPE_AMOUNT.equals(type)) {
+            norm = normalizeAmountCanonical(v);
+        } else {
+            // Default: whitespace normalization only.
+            norm = collapseWhitespace(v).trim();
+        }
+
+        if (norm.equals(v)) return item;
+        return new SensitiveDataItem(type, norm, item.getSource(), item.getStart(), item.getEnd());
+    }
+
+    /**
+     * Canonical AMOUNT normalization.
+     * - Removes thousands separators (commas/dots/spaces depending on locale)
+     * - Standardizes decimal separator to '.'
+     * - Always outputs exactly 2 decimal digits
+     * - Uppercases 3-letter currency codes
+     *
+     * Example: "USD 1,200.5" -> "USD 1200.50"
+     */
+    private String normalizeAmountCanonical(String raw) {
+        if (raw == null) return "";
+        String t = collapseWhitespace(raw).trim();
+        if (t.isEmpty()) return "";
+
+        // Strictly accept: 3-letter currency code + whitespace + numeric token.
+        // The numeric token may use spaces, commas and dots.
+        Matcher m = Pattern.compile("(?i)^([A-Z]{3})\\s+([0-9][0-9\\s,\\.]*)$").matcher(t);
+        if (!m.matches()) {
+            return t;
+        }
+
+        String ccy = m.group(1).toUpperCase(Locale.ROOT);
+        String numberToken = m.group(2);
+        if (numberToken == null) return ccy;
+
+        String number = numberToken.replaceAll("\\s+", "");
+        String normalized = normalizeDecimalNumberToTwoPlaces(number);
+        if (normalized == null) {
+            // Fail closed: don't risk wrong numeric mutation.
+            return ccy + " " + number;
+        }
+        return ccy + " " + normalized;
+    }
+
+    private String normalizeDecimalNumberToTwoPlaces(String token) {
+        if (token == null) return null;
+        String s = token.trim();
+        if (s.isEmpty()) return null;
+
+        int lastComma = s.lastIndexOf(',');
+        int lastDot = s.lastIndexOf('.');
+        Character decimalSep = null;
+
+        if (lastComma >= 0 && lastDot >= 0) {
+            decimalSep = (lastComma > lastDot) ? ',' : '.';
+        } else if (lastComma >= 0) {
+            int trailing = s.length() - lastComma - 1;
+            if (trailing >= 1 && trailing <= 2) decimalSep = ',';
+        } else if (lastDot >= 0) {
+            int trailing = s.length() - lastDot - 1;
+            if (trailing >= 1 && trailing <= 2) decimalSep = '.';
+        }
+
+        String intPart;
+        String fracPart;
+        if (decimalSep != null) {
+            String[] parts = splitOnLast(s, decimalSep);
+            if (parts.length != 2) return null;
+            intPart = parts[0];
+            fracPart = parts[1];
+        } else {
+            intPart = s;
+            fracPart = "";
+        }
+
+        // Remove grouping separators from integer part.
+        intPart = intPart.replace(",", "").replace(".", "");
+        intPart = intPart.replaceAll("[^0-9]", "");
+        if (intPart.isEmpty()) return null;
+
+        fracPart = fracPart == null ? "" : fracPart.replaceAll("[^0-9]", "");
+        String frac2;
+        if (fracPart.isEmpty()) {
+            frac2 = "00";
+        } else if (fracPart.length() == 1) {
+            frac2 = fracPart + "0";
+        } else {
+            frac2 = fracPart.substring(0, 2);
+        }
+
+        return intPart + "." + frac2;
+    }
+
+    private String[] splitOnLast(String s, char sep) {
+        int idx = s.lastIndexOf(sep);
+        if (idx < 0) return new String[]{s, ""};
+        return new String[]{s.substring(0, idx), s.substring(idx + 1)};
+    }
+
+    private String collapseWhitespace(String s) {
+        if (s == null || s.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        boolean prevWs = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ws = Character.isWhitespace(c);
+            if (ws) {
+                if (!prevWs) sb.append(' ');
+                prevWs = true;
+            } else {
+                sb.append(c);
+                prevWs = false;
+            }
+        }
+        return sb.toString();
     }
 
     private String stripMarkdownCodeFences(String s) {
@@ -740,11 +992,20 @@ public class PiiDetectService {
         Pattern iban = Pattern.compile("\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b", Pattern.CASE_INSENSITIVE);
         findAllMatches(out, TYPE_BANK_ACCOUNT, sourceLabel, text, iban);
 
-        // Generic long account number: 10-18 digits (word boundaries), excluding 12-digit sequences.
-        // Rationale: 12-digit numbers are especially ambiguous (references/IDs) and must not be
-        // automatically treated as BANK_ACCOUNT.
-        Pattern digits = Pattern.compile("\\b(?:\\d{10,11}|\\d{13,18})\\b");
-        findAllMatches(out, TYPE_BANK_ACCOUNT, sourceLabel, text, digits);
+        // Numeric account numbers MUST NOT be classified by length alone.
+        // Require a clear label near the number to reduce ambiguity and prevent collisions with phone/card/reference numbers.
+        // Example matches: "Acct 1234567890", "Account No: 1234567890123", "A/C 12345678901".
+        Pattern labeledDigits = Pattern.compile("(?i)\\b(?:acct|account|a/c|acc\\.?|account\\s*no\\.?)\\s*[:#-]?\\s*(\\d{10,18})\\b");
+        Matcher m = labeledDigits.matcher(text);
+        while (m.find()) {
+            int s = m.start(1);
+            int e = m.end(1);
+            if (s < 0 || e <= s || e > text.length()) continue;
+            String value = text.substring(s, e);
+            if (isValidOffsets(text, value, s, e)) {
+                out.add(new SensitiveDataItem(TYPE_BANK_ACCOUNT, value, sourceLabel, s, e));
+            }
+        }
 
         return out;
     }
