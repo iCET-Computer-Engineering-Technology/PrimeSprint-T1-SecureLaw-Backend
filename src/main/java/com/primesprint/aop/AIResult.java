@@ -1,4 +1,4 @@
-package com.primesprint.common;
+package com.primesprint.aop;
 
 import java.util.Map;
 

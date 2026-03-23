@@ -1,9 +1,9 @@
 package com.primesprint.service.impl;
 
-import com.primesprint.common.impl.AIResponseResult;
+import com.primesprint.model.AIResponseResult;
 import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.custom_annotation.Auditable;
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.service.TestAuditService;
 import org.springframework.stereotype.Service;
 

@@ -1,6 +1,6 @@
 package com.primesprint.mapper;
 
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.model.AuditLog;
 import org.springframework.jdbc.core.RowMapper;
 import com.fasterxml.jackson.core.type.TypeReference;

@@ -1,7 +1,7 @@
 package com.primesprint.custom_annotation;
 
 
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

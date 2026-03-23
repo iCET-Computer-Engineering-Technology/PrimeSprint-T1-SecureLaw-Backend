@@ -1,7 +1,7 @@
 package com.primesprint.service;
 
 
-import com.primesprint.common.impl.AIResponseResult;
+import com.primesprint.model.AIResponseResult;
 
 public interface TestAuditService {
 

@@ -1,8 +1,7 @@
 package com.primesprint.aop;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.custom_annotation.Auditable;
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.model.AuditLog;
 import com.primesprint.service.AuditLogService;
 import lombok.RequiredArgsConstructor;

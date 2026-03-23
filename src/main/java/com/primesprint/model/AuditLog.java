@@ -1,7 +1,7 @@
 package com.primesprint.model;
 
 
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Map;

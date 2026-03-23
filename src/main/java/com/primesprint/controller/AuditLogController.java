@@ -2,7 +2,7 @@ package com.primesprint.controller;
 
 import com.primesprint.dto.AuditLogDto;
 import com.primesprint.dto.PIIDailyCount;
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.service.AuditLogService;
 import com.primesprint.service.ExportAuditService;
 import jakarta.servlet.http.HttpServletResponse;

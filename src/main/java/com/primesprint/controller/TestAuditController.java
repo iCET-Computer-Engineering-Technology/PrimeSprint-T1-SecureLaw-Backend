@@ -1,7 +1,7 @@
 package com.primesprint.controller;
 
 
-import com.primesprint.common.impl.AIResponseResult;
+import com.primesprint.model.AIResponseResult;
 import com.primesprint.service.TestAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

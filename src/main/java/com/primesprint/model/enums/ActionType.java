@@ -1,4 +1,4 @@
-package com.primesprint.enums;
+package com.primesprint.model.enums;
 
 public enum ActionType {
     USER_CREATED,USER_UPDATED,USER_DEACTIVATED,AI_REQUEST,ROLE_CHANGED,LOGIN,TEMPLATE_UPDATED,TEST_ACTION;

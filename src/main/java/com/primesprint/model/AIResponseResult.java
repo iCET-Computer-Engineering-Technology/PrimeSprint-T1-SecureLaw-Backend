@@ -1,6 +1,6 @@
-package com.primesprint.common.impl;
+package com.primesprint.model;
 
-import com.primesprint.common.AIResult;
+import com.primesprint.aop.AIResult;
 import lombok.*;
 
 import java.util.Map;

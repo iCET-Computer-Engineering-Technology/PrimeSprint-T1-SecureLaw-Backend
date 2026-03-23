@@ -1,7 +1,6 @@
 package com.primesprint.aop;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.primesprint.common.AIResult;
 import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.model.AuditLog;
 import com.primesprint.service.AuditLogService;

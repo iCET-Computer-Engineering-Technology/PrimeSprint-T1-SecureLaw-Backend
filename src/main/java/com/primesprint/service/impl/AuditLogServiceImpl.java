@@ -3,7 +3,7 @@ package com.primesprint.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.dto.AuditLogDto;
 import com.primesprint.dto.PIIDailyCount;
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.mapper.AuditLogMapper;
 import com.primesprint.model.AuditLog;
 import com.primesprint.repository.AuditLogRepository;

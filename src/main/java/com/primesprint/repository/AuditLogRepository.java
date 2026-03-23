@@ -3,7 +3,7 @@ package com.primesprint.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.dto.PIIDailyCount;
-import com.primesprint.enums.ActionType;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.model.AuditLog;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
