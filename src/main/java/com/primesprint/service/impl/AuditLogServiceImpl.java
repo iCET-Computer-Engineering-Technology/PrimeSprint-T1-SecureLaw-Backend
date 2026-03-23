@@ -70,8 +70,8 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    public List<PIIDailyCount> getPiiBlockedPerDay(){
-        return repository.getPiiBlockedPerDay();
+    public List<PIIDailyCount> getPiiMaskedPerDay(){
+        return repository.getPiiMaskedPerDay();
     }
 
     @Override

@@ -21,7 +21,7 @@ public interface AuditLogRepository {
 
     public List<AuditLog> findByDateRangeAndUser(LocalDateTime startDate, LocalDateTime endDate, String userId) throws SQLException;
 
-    public List<PIIDailyCount> getPiiBlockedPerDay();
+    public List<PIIDailyCount> getPiiMaskedPerDay();
 
     public List<AuditLog> findByAction(ActionType action) throws SQLException;
 

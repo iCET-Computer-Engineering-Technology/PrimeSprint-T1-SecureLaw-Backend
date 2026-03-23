@@ -97,7 +97,7 @@ public class AuditLogRepositoryImpl implements AuditLogRepository {
         );
     }
 
-    public List<PIIDailyCount> getPiiBlockedPerDay() {
+    public List<PIIDailyCount> getPiiMaskedPerDay() {
 
         String sql = """
         SELECT DATE(timestamp) AS day, SUM(value::int) AS total

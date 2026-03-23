@@ -23,7 +23,7 @@ public interface AuditLogService {
 
     public void recordAuditLog(AuditLog log) throws SQLException, JsonProcessingException;
 
-    public List<PIIDailyCount> getPiiBlockedPerDay();
+    public List<PIIDailyCount> getPiiMaskedPerDay();
 
     public List<AuditLogDto> searchByAction(ActionType action) throws SQLException;
 

@@ -147,7 +147,7 @@ public class AuditLogController {
 
     @GetMapping("/pii-daily-count")
     public List<PIIDailyCount> getPiiStats(){
-        return service.getPiiBlockedPerDay();
+        return service.getPiiMaskedPerDay();
     }
 
 }
