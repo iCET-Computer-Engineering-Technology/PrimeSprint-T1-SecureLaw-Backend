@@ -15,6 +15,17 @@ public class JwtProperties {
     private long expirationTime;
     private long refreshTokenExpirationTime;
 
+
+    public static class Access{
+        private Token token;
+    }
+    public static class Refresh{
+        private Token token;
+    }
+    public static class Token{
+        private long ttl;
+    }
+
     @PostConstruct
     public void validate() {
         if (secretKey == null || secretKey.isEmpty()) {
