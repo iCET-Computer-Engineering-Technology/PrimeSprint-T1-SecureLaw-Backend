@@ -1,4 +1,4 @@
-package com.primesprint.pii.dto;
+package com.primesprint.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

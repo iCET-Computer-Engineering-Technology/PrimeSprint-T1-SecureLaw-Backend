@@ -1,4 +1,4 @@
-package com.primesprint.pii.dto;
+package com.primesprint.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
