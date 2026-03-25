@@ -20,5 +20,5 @@ CREATE TABLE access_token_denylist
 (
     jti        VARCHAR(255) PRIMARY KEY,
     user_id    UUID      NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL
 );

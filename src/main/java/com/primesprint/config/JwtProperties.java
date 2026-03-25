@@ -11,31 +11,33 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {
-    private String secretKey;
-    private long expirationTime;
-    private long refreshTokenExpirationTime;
+    private String secret;
+    private Access access;
+    private Refresh refresh;
 
-
+    @Getter @Setter
     public static class Access{
         private Token token;
     }
+    @Getter @Setter
     public static class Refresh{
         private Token token;
     }
+    @Getter @Setter
     public static class Token{
         private long ttl;
     }
 
     @PostConstruct
     public void validate() {
-        if (secretKey == null || secretKey.isEmpty()) {
+        if (secret == null || secret.isEmpty()) {
             throw new IllegalArgumentException("JWT secret key must not be null or empty");
         }
-        if (expirationTime <= 0) {
-            throw new IllegalArgumentException("JWT expiration time must be greater than zero");
+        if (access == null || access.getToken() == null) {
+             throw new IllegalArgumentException("JWT access token configuration must not be null");
         }
-        if (refreshTokenExpirationTime <= 0) {
-            throw new IllegalArgumentException("JWT refresh token expiration time must be greater than zero");
+        if (refresh == null || refresh.getToken() == null) {
+             throw new IllegalArgumentException("JWT refresh token configuration must not be null");
         }
     }
 }
