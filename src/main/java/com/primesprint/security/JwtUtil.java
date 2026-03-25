@@ -1,10 +1,12 @@
 package com.primesprint.security;
 
+import com.primesprint.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -14,16 +16,13 @@ import java.util.function.Function;
 
 
 @Component
+@RequiredArgsConstructor
 public class JwtUtil {
 
-    // Secret key (should come from application.properties in production)
-    private final String SECRET = "mySuperSecretKeyForJwtAuthentication123456";
-
-    // Token validity: 24 hours
-    private final long JWT_EXPIRATION = 1000 * 60 * 60 * 24;
+    private final JwtProperties jwtProperties;
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET.getBytes());
+        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes());
     }
 
     // Extract username from token
@@ -60,10 +59,12 @@ public class JwtUtil {
     // Generate JWT token
     public String generateToken(UserDetails userDetails) {
 
+        long ttl = jwtProperties.getAccess().getToken().getTtl();
+
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + JWT_EXPIRATION))
+                .setExpiration(new Date(System.currentTimeMillis() + ttl))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
