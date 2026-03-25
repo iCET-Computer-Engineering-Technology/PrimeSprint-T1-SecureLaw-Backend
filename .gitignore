@@ -13,6 +13,8 @@ target/
 !.idea/libraries/
 .idea/dataSources*
 .idea/dataSources/
+.idea/dataSources.xml
+.idea/material_theme_project_new.xml
 *.iws
 *.iml
 *.ipr
