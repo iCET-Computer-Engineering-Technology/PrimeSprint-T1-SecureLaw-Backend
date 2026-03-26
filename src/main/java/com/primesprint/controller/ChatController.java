@@ -7,7 +7,7 @@ import com.primesprint.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-@CrossOrigin(origins="http://localhost:4200")
+
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
@@ -22,11 +22,12 @@ public class ChatController {
     }
 
     @PostMapping("/message")
-    public ResponseEntity<ChatMessageResponse> sendMessage(@RequestBody ChatMessageRequest request) {
-        if (request.getMessage() == null || request.getMessage().isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        ChatMessageResponse response = chatService.sendMessage(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<String> sendMessage(@RequestBody ChatMessageRequest request) {
+//        if (request.getMessage() == null || request.getMessage().isBlank()) {
+//            return ResponseEntity.badRequest().build();
+//        }
+//        ChatMessageResponse response = chatService.sendMessage(request);
+//        return ResponseEntity.ok(response);
+        return ResponseEntity.ok("This is mock ai Response : hi ,hello how are you");
     }
 }
