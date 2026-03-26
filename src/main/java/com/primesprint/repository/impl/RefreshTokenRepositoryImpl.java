@@ -32,18 +32,22 @@ public class RefreshTokenRepositoryImpl implements RefreshTokenRepository {
     @Override
     public void replace(UUID oldTokenId, UUID newTokenId) {
         jdbcTemplate.update("""
-            UPDATE refresh_tokens SET revoked = true, replaced_by_token_id = ? WHERE id = ?
+            UPDATE refresh_tokens SET revoked = true, replaced_by = ? WHERE id = ?
            """
         , newTokenId, oldTokenId);
     }
 
     @Override
     public void revokeAllByUserId(UUID userId) {
-
+        jdbcTemplate.update("""
+            UPDATE refresh_tokens SET revoked = true WHERE user_id = ?""", userId);
     }
 
     @Override
     public Map<String, Object> findByTokenHash(String tokenHash) {
-        return Map.of();
+
+        return jdbcTemplate.queryForMap("""
+            SELECT id, user_id, expires_at, revoked FROM refresh_tokens WHERE token_hash = ?"""
+                , tokenHash);
     }
 }
