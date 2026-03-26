@@ -12,5 +12,4 @@ public class AccessTokenDenylist {
     private String jti;
     private UUID userId;
     private Instant expiresAt;
-
 }
