@@ -75,9 +75,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout() {
-        // Stateless JWT: logout is handled client-side by discarding the token.
-        return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
+    public ResponseEntity<?> logout(@CookieValue("refresh_token") String token,
+                                    HttpServletResponse response) {
+
+        refreshTokenService.verify(token); // then revoke
+
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", "")
+                .maxAge(0)
+                .path("/api/auth/refresh")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return ResponseEntity.ok("Logged out");
     }
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue("refresh_token") String token,
