@@ -13,11 +13,13 @@ import com.primesprint.service.impl.RefreshTokenServiceImpl;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Date;
@@ -68,9 +70,21 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserDto> me(@AuthenticationPrincipal UserDetails userDetails) {
-        // User is resolved from SecurityContext that JwtFilter populated using Authorization: Bearer <token>
-        UserDto user = authService.getUserByUsername(userDetails.getUsername());
+    public ResponseEntity<UserDto> me(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+
+        if (userDetails == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Unauthorized"
+            );
+        }
+
+        UserDto user = authService.getUserByUsername(
+                userDetails.getUsername()
+        );
+
         return ResponseEntity.ok(user);
     }
 
