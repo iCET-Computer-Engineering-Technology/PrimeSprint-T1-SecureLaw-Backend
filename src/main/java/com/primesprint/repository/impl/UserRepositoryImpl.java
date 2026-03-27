@@ -5,6 +5,7 @@ import com.primesprint.model.entity.User;
 import com.primesprint.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,6 +15,27 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserRepositoryImpl implements UserRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private final RowMapper<User> userRowMapper = (rs, rowNum) -> {
+        User user = new User();
+
+        user.setId(UUID.fromString(rs.getString("id")));
+        user.setUsername(rs.getString("username"));
+        user.setEmail(rs.getString("email"));
+        user.setPassword(rs.getString("password"));
+        user.setStatus(rs.getString("status"));
+
+        // Convert role string → enum
+        String roleName = rs.getString("role_name");
+        if (roleName != null) {
+            user.setRole(com.primesprint.model.enums.Role.valueOf(roleName));
+        }
+
+        user.setCreatedAt(rs.getTimestamp("created_at"));
+        user.setUpdatedAt(rs.getTimestamp("updated_at"));
+
+        return user;
+    };
 
     @Override
     public User findByUsernameOrEmail(String usernameOrEmail) {
@@ -74,5 +96,41 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public void updateUserStatus(UUID userId, String status) {
 
+    }
+
+    // =========================================================
+    // 🔍 FIND BY ID
+    // =========================================================
+    @Override
+    public User findById(UUID id) {
+
+        String sql = """
+            SELECT u.*, r.name AS role_name
+            FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE u.id = ?
+        """;
+
+        try {
+            return jdbcTemplate.queryForObject(
+                sql,userRowMapper,id
+            );
+        } catch (Exception ex) {
+            return null; // same behavior as your existing repo
+        }
+    }
+    // =========================================================
+    // 🔒 UPDATE PASSWORD_CHANGED_AT
+    // =========================================================
+    @Override
+    public void updatePasswordChangedAt(UUID userId) {
+
+        String sql = """
+            UPDATE users
+            SET password_changed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """;
+
+        jdbcTemplate.update(sql, userId);
     }
 }

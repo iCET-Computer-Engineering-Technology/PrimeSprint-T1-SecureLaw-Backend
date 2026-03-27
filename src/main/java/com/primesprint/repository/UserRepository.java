@@ -11,4 +11,11 @@ public interface UserRepository {
     void saveUser(String username, String email, String password, UUID roleId);
 
     void updateUserStatus(UUID userId, String status);
+
+    User findById(UUID id);
+
+    // =========================================================
+    // 🔒 UPDATE PASSWORD_CHANGED_AT
+    // =========================================================
+    void updatePasswordChangedAt(UUID userId);
 }
