@@ -42,9 +42,9 @@ public class AuthController {
         User user = authService.authenticate(request);
 
         // Authenticate user and generate JWT
-        String jwt = authService.loginAndGetToken(request);
-        Date exp = jwtUtil.extractExpiration(jwt);//
-        String refresh = refreshTokenServiceImpl.create(UUID.randomUUID());
+        String accessToken = jwtUtil.generateToken(user);
+        Date exp = jwtUtil.extractExpiration(accessToken);//
+        String refresh = refreshTokenServiceImpl.create(user.getId());
 
         ResponseCookie cookie = ResponseCookie.from("refreshToken", refresh)
                 .httpOnly(true)
@@ -58,8 +58,8 @@ public class AuthController {
 
 
         return ResponseEntity.ok(Map.of(
-                "token", jwt,
-                "expiresAt", exp.getTime(),
+                "accessToken", accessToken,
+                "accessTokenExpiresAt", exp.toInstant(),
                 "role",user.getRole().name()));
     }
 

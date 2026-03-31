@@ -10,30 +10,20 @@ import java.util.UUID;
 
 public interface AuthService {
 
-    LoginResponse login(LoginRequest request);
-
-    // =========================================================
-    // 🔐 AUTHENTICATE (LOGIN VALIDATION ONLY)
-    // =========================================================
     User authenticate(LoginRequest request);
 
     void register(RegisterRequest request);
 
-    String loginAndGetToken(LoginRequest request);
-
-    // =========================================================
-    // 👤 GET USER BY ID (FOR REFRESH FLOW)
-    // =========================================================
     User getById(UUID id);
 
     // =========================================================
-    // 🔒 PASSWORD CHANGE SUPPORT
+    // 👤 GET USER FROM TOKEN (USED IN /me)
     // =========================================================
-    void updatePasswordChangedAt(UUID userId);
-
-    boolean validateToken(String token);
-
     UserDto getUserFromToken(String token);
 
     UserDto getUserByUsername(String username);
+
+    void updatePasswordChangedAt(UUID userId);
+
+    boolean validateToken(String token);
 }

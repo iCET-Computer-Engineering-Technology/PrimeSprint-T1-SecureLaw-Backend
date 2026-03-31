@@ -74,6 +74,7 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+
     // =========================================================
     // 👤 GET USER FROM TOKEN (USED IN /me)
     // =========================================================
@@ -130,9 +131,6 @@ public class AuthServiceImpl implements AuthService {
         userRepository.updatePasswordChangedAt(userId);
     }
 
-    // =========================================================
-    // 🔐 OPTIONAL TOKEN VALIDATION (LEGACY SUPPORT)
-    // =========================================================
     @Override
     public boolean validateToken(String token) {
         throw new UnsupportedOperationException(
