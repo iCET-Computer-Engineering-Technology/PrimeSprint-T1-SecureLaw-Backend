@@ -21,7 +21,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -33,8 +32,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtUtil jwtUtil;
-    private final RefreshTokenService refreshTokenServiceImpl;
-    RefreshTokenService refreshTokenService;
+    private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request , HttpServletResponse response) {
@@ -44,12 +42,12 @@ public class AuthController {
         // Authenticate user and generate JWT
         String accessToken = jwtUtil.generateToken(user);
         Date exp = jwtUtil.extractExpiration(accessToken);//
-        String refresh = refreshTokenServiceImpl.create(user.getId());
+        String refresh = refreshTokenService.create(user.getId());
 
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", refresh)
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", refresh)
                 .httpOnly(true)
                 .secure(true)
-                .path("/api/auth/refresh")
+                .path("/api/auth")
                 .maxAge(60 * 60 * 24 * 30)
                 .sameSite("Strict")
                 .build();
@@ -96,7 +94,7 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("refresh_token", "")
                 .maxAge(0)
-                .path("/api/auth/refresh")
+                .path("/api/auth")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -120,7 +118,7 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("refresh_token", newRefresh)
                 .httpOnly(true)
                 .secure(true)
-                .path("/api/auth/refresh")
+                .path("/api/auth")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
