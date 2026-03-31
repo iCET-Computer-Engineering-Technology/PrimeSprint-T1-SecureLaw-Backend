@@ -73,13 +73,14 @@ public class GeminiServiceImpl implements GeminiService {
         }
 
         try (Client client = Client.builder().apiKey(apiKey).build()) {
+            String model = "gemini-3-flash-preview";
             GenerateContentResponse response =
                     client.models.generateContent(
-                            "gemini-3-flash-preview",
+                            model,
                             text,
                             null);
 
-            return new ExternalAiResponse(externalAiRequest.getRequestId(),externalAiRequest.getProvider(),"",response.text(),null);
+            return new ExternalAiResponse(externalAiRequest.getRequestId(), externalAiRequest.getProvider(), model, response.text(), null);
         }
     }
 
