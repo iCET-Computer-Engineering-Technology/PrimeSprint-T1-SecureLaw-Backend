@@ -1,7 +1,5 @@
 package com.primesprint.controller;
 
-import ch.qos.logback.core.model.Model;
-import com.primesprint.dto.ResetPasswordDateDTO;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
 import com.primesprint.model.dto.request.RegisterRequest;
@@ -12,8 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
 import java.time.Instant;
 
 @RestController
@@ -28,7 +24,6 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         // Authenticate user and generate JWT
         String jwt = authService.loginAndGetToken(request);
-
         // Build LoginResponse with all required fields; client must store token and send it as Authorization: Bearer <token>
         UserDto user = authService.getUserFromToken(jwt);
         LoginResponse loginResponse = new LoginResponse(
@@ -59,9 +54,10 @@ public class AuthController {
         return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
     }
 
-    @GetMapping("/email")
-    public ResponseEntity<UserDto> getEmail(@AuthenticationPrincipal UserDetails userDetails) {
-        UserDto user = authService.getUserByUsername(userDetails.getPassword());
-        return ResponseEntity.ok(user);
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody UserDto userDto) {
+       authService.resetPassword(userDto.getEmail(), userDto.getResetPassword());
+        return ResponseEntity.ok("Password has been reset successfully");
     }
 }

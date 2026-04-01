@@ -118,7 +118,7 @@ public class AuthService {
         User user = userRepository.findByUsernameOrEmail(email);
         if (user == null) {
             throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.NOT_FOUND,
                     "Email not found"
             );
         }
@@ -130,6 +130,6 @@ public class AuthService {
         User user = userRepository.findByUsernameOrEmail(email);
         String encodedPassword=passwordEncoder.encode(newPassword);
         user.setPassword(encodedPassword);
-        userRepository.saveNewPassword(newPassword);
+        userRepository.saveNewPassword(newPassword);//can come nullPointException
     }
 }
