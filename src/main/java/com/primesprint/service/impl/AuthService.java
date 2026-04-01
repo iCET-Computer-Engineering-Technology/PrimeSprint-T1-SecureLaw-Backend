@@ -125,4 +125,11 @@ public class AuthService {
         return userMapper.toDto(user);
     }
 
+    public void resetPassword(String email,String newPassword){
+        emailValidation(email);
+        User user = userRepository.findByUsernameOrEmail(email);
+        String encodedPassword=passwordEncoder.encode(newPassword);
+        user.setPassword(encodedPassword);
+        userRepository.saveNewPassword(newPassword);
+    }
 }
