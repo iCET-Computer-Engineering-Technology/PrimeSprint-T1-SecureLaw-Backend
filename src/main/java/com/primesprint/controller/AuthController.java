@@ -19,7 +19,6 @@ public class AuthController {
 
     private final AuthService authService;
 
-
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         // Authenticate user and generate JWT
@@ -53,7 +52,6 @@ public class AuthController {
         // Stateless JWT: logout is handled client-side by discarding the token.
         return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
     }
-
 
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@RequestBody UserDto userDto) {
