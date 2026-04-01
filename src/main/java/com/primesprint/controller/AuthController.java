@@ -58,16 +58,10 @@ public class AuthController {
         // Stateless JWT: logout is handled client-side by discarding the token.
         return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
     }
-    @PostMapping("/request-password-reset")
-    public String resetPassword(final ResetPasswordDateDTO forgetPassword, RedirectAttributes redirectAttributes){
-        return "";
-    }
-    @GetMapping("/change")
-    public String changePassword(@RequestParam(required = false)String token,final RedirectAttributes redirectAttributes,final Model model){
-        return "";
-    }
-    @PostMapping("/change")
-    public String changePassword(final ResetPasswordDateDTO date , final Model model){
-        return "";
+
+    @GetMapping("/email")
+    public ResponseEntity<UserDto> getEmail(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto user = authService.getUserByUsername(userDetails.getPassword());
+        return ResponseEntity.ok(user);
     }
 }

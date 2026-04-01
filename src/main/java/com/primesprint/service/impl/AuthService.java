@@ -11,7 +11,6 @@ import com.primesprint.repository.UserRepository;
 import com.primesprint.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,8 +28,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
     private final UserMapper userMapper;
-    private final JavaMailSender javaMailSender;
-
+    private final UserDto userDto;
 
 
     public LoginResponse login(LoginRequest request) {
@@ -116,6 +114,15 @@ public class AuthService {
         return userMapper.toDto(user);
     }
 
-
+    public UserDto emailValidation(String email) {
+        User user = userRepository.findByUsernameOrEmail(email);
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Email not found"
+            );
+        }
+        return userMapper.toDto(user);
+    }
 
 }
