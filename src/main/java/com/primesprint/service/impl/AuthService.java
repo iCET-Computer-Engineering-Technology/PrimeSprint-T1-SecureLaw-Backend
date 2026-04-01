@@ -1,4 +1,4 @@
-package com.primesprint.service;
+package com.primesprint.service.impl;
 
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.UserDto;
@@ -11,6 +11,7 @@ import com.primesprint.repository.UserRepository;
 import com.primesprint.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,6 +29,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
     private final UserMapper userMapper;
+    private final JavaMailSender javaMailSender;
 
 
 
@@ -113,5 +115,7 @@ public class AuthService {
 
         return userMapper.toDto(user);
     }
+
+
 
 }

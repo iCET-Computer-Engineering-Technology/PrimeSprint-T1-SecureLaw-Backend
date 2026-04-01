@@ -1,15 +1,18 @@
 package com.primesprint.controller;
 
+import ch.qos.logback.core.model.Model;
+import com.primesprint.dto.ResetPasswordDateDTO;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
 import com.primesprint.model.dto.request.RegisterRequest;
 import com.primesprint.model.dto.response.LoginResponse;
-import com.primesprint.service.AuthService;
+import com.primesprint.service.impl.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.Instant;
 
@@ -19,6 +22,7 @@ import java.time.Instant;
 public class AuthController {
 
     private final AuthService authService;
+
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
@@ -53,5 +57,17 @@ public class AuthController {
     public ResponseEntity<String> logout() {
         // Stateless JWT: logout is handled client-side by discarding the token.
         return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
+    }
+    @PostMapping("/request-password-reset")
+    public String resetPassword(final ResetPasswordDateDTO forgetPassword, RedirectAttributes redirectAttributes){
+        return "";
+    }
+    @GetMapping("/change")
+    public String changePassword(@RequestParam(required = false)String token,final RedirectAttributes redirectAttributes,final Model model){
+        return "";
+    }
+    @PostMapping("/change")
+    public String changePassword(final ResetPasswordDateDTO date , final Model model){
+        return "";
     }
 }
