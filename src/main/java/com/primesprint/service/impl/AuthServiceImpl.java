@@ -26,9 +26,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
 
-    // =========================================================
-    // 🔐 AUTHENTICATE (LOGIN VALIDATION ONLY)
-    // =========================================================
+    //AUTHENTICATE (LOGIN VALIDATION ONLY)
     @Override
     public User authenticate(LoginRequest request) {
 
@@ -55,9 +53,7 @@ public class AuthServiceImpl implements AuthService {
         return user;
     }
 
-    // =========================================================
-    // 📝 REGISTER (UNCHANGED)
-    // =========================================================
+    // REGISTER (UNCHANGED
     @Override
     public void register(RegisterRequest request) {
 
@@ -74,10 +70,7 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
-
-    // =========================================================
-    // 👤 GET USER FROM TOKEN (USED IN /me)
-    // =========================================================
+    // GET USER FROM TOKEN (USED IN /me
     @Override
     public UserDto getUserFromToken(String token) {
 
@@ -85,10 +78,7 @@ public class AuthServiceImpl implements AuthService {
                 "Use JwtFilter + SecurityContext instead"
         );
     }
-
-    // =========================================================
-    // 👤 GET USER BY USERNAME
-    // =========================================================
+    // GET USER BY USERNAM
     @Override
     public UserDto getUserByUsername(String username) {
 
@@ -103,10 +93,7 @@ public class AuthServiceImpl implements AuthService {
 
         return userMapper.toDto(user);
     }
-
-    // =========================================================
-    // 👤 GET USER BY ID (FOR REFRESH FLOW)
-    // =========================================================
+    // GET USER BY ID (FOR REFRESH FLOW
     @Override
     public User getById(UUID id) {
 
@@ -121,10 +108,7 @@ public class AuthServiceImpl implements AuthService {
 
         return user;
     }
-
-    // =========================================================
-    // 🔒 PASSWORD CHANGE SUPPORT
-    // =========================================================
+    // PASSWORD CHANGE SUPPOR
     @Override
     public void updatePasswordChangedAt(UUID userId) {
 

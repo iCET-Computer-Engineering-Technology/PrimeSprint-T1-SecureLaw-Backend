@@ -14,8 +14,5 @@ public interface UserRepository {
 
     User findById(UUID id);
 
-    // =========================================================
-    // 🔒 UPDATE PASSWORD_CHANGED_AT
-    // =========================================================
     void updatePasswordChangedAt(UUID userId);
 }
