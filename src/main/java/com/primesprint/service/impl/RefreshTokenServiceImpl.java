@@ -4,7 +4,9 @@ import com.primesprint.config.JwtProperties;
 import com.primesprint.repository.RefreshTokenRepository;
 import com.primesprint.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -32,9 +34,47 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     public Map<String, Object> verify(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing refresh token");
+        }
+
         String tokenHash = sha256(refreshToken);
-        var record = refreshTokenRepository.findByTokenHash(tokenHash);
+        Map<String, Object> record;
+        try {
+            record = refreshTokenRepository.findByTokenHash(tokenHash);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+        }
+
+        if (record == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+        }
+
+        if (Boolean.TRUE.equals(record.get("revoked"))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token revoked");
+        }
+
+        Object expiresAt = record.get("expires_at");
+        if (expiresAt instanceof Timestamp timestamp && timestamp.before(new Timestamp(System.currentTimeMillis()))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired");
+        }
+
         return record;
+    }
+
+    @Override
+    public void revoke(String refreshToken) {
+        Map<String, Object> record = verify(refreshToken);
+        Object id = record.get("id");
+        if (id instanceof UUID tokenId) {
+            refreshTokenRepository.revoke(tokenId);
+            return;
+        }
+        if (id != null) {
+            refreshTokenRepository.revoke(UUID.fromString(id.toString()));
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
     }
 
     private String generateToken() {

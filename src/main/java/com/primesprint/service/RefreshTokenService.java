@@ -10,4 +10,6 @@ public interface RefreshTokenService {
     String create(UUID userId);
 
     Map<String, Object> verify(String refreshToken);
+
+    void revoke(String refreshToken);
 }
