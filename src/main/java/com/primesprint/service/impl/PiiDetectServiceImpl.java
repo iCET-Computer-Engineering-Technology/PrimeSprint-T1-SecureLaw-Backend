@@ -143,8 +143,8 @@ public class PiiDetectServiceImpl implements PiiDetectService {
         if (!docRes.failed) combined.addAll(docRes.items == null ? List.of() : docRes.items);
         if (!promptRes.failed) combined.addAll(promptRes.items == null ? List.of() : promptRes.items);
 
-        // 1) Remove duplicates where same type, source, and value (ignore start/end)
-        combined = dedupeByTypeValueSource(combined);
+        // FIX: Remove exact duplicates based on span to prevent erasing multiple occurrences
+        combined = dedupeBySpanKey(combined);
 
         // 2) Resolve overlaps within each source (type-aware, deterministic)
         combined = resolveOverlapsPerSource(combined);
@@ -190,7 +190,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
                     log.warn("pii-detect requestId={} source={} stage=llm_null_response -> using_deterministic_only", requestId, source);
                     List<SensitiveDataItem> merged = new ArrayList<>(deterministic);
                     merged = expandDuplicateSpans(text, merged);
-                    merged = dedupeByTypeValueSource(merged);
+                    merged = dedupeBySpanKey(merged); // FIX: Applied here too
                     merged = resolveOverlapsPerSource(merged);
                     return ParseResult.ok(merged);
                 }
@@ -201,7 +201,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
                 merged.addAll(deterministic);
                 merged.addAll(items);
                 merged = expandDuplicateSpans(text, merged);
-                merged = dedupeByTypeValueSource(merged);
+                merged = dedupeBySpanKey(merged); // FIX: Applied here too
                 merged = resolveOverlapsPerSource(merged);
                 return ParseResult.ok(merged);
             } catch (Exception ex) {
@@ -221,7 +221,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
         log.warn("pii-detect requestId={} source={} stage=retries_exhausted -> using_deterministic_only", requestId, source);
         List<SensitiveDataItem> merged = new ArrayList<>(deterministic);
         merged = expandDuplicateSpans(text, merged);
-        merged = dedupeByTypeValueSource(merged);
+        merged = dedupeBySpanKey(merged); // FIX: Applied here too
         merged = resolveOverlapsPerSource(merged);
         return ParseResult.ok(merged);
     }
@@ -481,7 +481,8 @@ public class PiiDetectServiceImpl implements PiiDetectService {
         List<int[]> spans = new ArrayList<>();
         int from = 0;
         while (from <= sourceText.length()) {
-            int idx = sourceText.indexOf(value, from);
+            // Case-insensitive fallback recovery
+            int idx = sourceText.toLowerCase().indexOf(value.toLowerCase(), from);
             if (idx < 0) break;
             spans.add(new int[]{idx, idx + value.length()});
             from = idx + 1;
@@ -501,7 +502,8 @@ public class PiiDetectServiceImpl implements PiiDetectService {
 
             Pattern p;
             try {
-                p = Pattern.compile(Pattern.quote(value));
+                // FIX: Case insensitive to handle LLM auto-capitalization vs exact document casing
+                p = Pattern.compile(Pattern.quote(value), Pattern.CASE_INSENSITIVE);
             } catch (Exception ex) {
                 expanded.add(item);
                 continue;
@@ -514,7 +516,9 @@ public class PiiDetectServiceImpl implements PiiDetectService {
                 int s = m.start();
                 int e = m.end();
                 if (isValidOffsets(sourceText, value, s, e)) {
-                    expanded.add(new SensitiveDataItem(item.getType(), value, item.getSource(), s, e));
+                    // Pull the exact matched text from the source to maintain document fidelity
+                    String exactMatch = sourceText.substring(s, e);
+                    expanded.add(new SensitiveDataItem(item.getType(), exactMatch, item.getSource(), s, e));
                 }
             }
 
@@ -557,7 +561,8 @@ public class PiiDetectServiceImpl implements PiiDetectService {
             if (start > sourceText.length() || end > sourceText.length()) return false;
 
             String extracted = sourceText.substring(start, end);
-            if (!extracted.equals(value)) {
+            // FIX: Ignore case so LLM grammar auto-corrections don't fail validation
+            if (!extracted.equalsIgnoreCase(value)) {
                 log.debug("pii-detect stage=value_mismatch start={} end={} extractedLen={} valueLen={}",
                         start, end, extracted.length(), value.length());
                 return false;
@@ -576,7 +581,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
         out.addAll(detectNames(sourceLabel, text));
         out.addAll(detectEmails(sourceLabel, text));
         out.addAll(detectPhones(sourceLabel, text));
-        out.addAll(detectAddresses(sourceLabel, text));   // NEW: address detection
+        out.addAll(detectAddresses(sourceLabel, text));
         out.addAll(detectCaseIds(sourceLabel, text));
         out.addAll(detectEvidenceIds(sourceLabel, text));
         out.addAll(detectPassports(sourceLabel, text));
@@ -590,7 +595,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
 
     private List<SensitiveDataItem> detectNames(String sourceLabel, String text) {
         Set<String> labels = new HashSet<>(Arrays.asList(
-                "Client", "mr", "mrs", "ms", "dr", "prof", "hon", "miss", "master", "rev", "fr", "sir", "lady",
+                "client", "mr", "mrs", "ms", "dr", "prof", "hon", "miss", "master", "rev", "fr", "sir", "lady",
                 "lord", "judge", "justice", "president", "governor", "senator", "representative", "ambassador",
                 "secretary", "minister", "director", "officer", "chief", "head", "manager", "ceo", "cfo", "coo",
                 "contact", "bank accounts", "driver license", "address", "phone", "email", "case id", "contract"
@@ -632,16 +637,12 @@ public class PiiDetectServiceImpl implements PiiDetectService {
     }
 
     private List<SensitiveDataItem> detectPhones(String sourceLabel, String text) {
-        // International format with optional + and country code
         Pattern intlPattern = Pattern.compile("\\+\\d{1,3}[\\s-]?\\d{1,3}[\\s-]?\\d{3}[\\s-]?\\d{4}");
-        // Local format with separators
         Pattern localPattern = Pattern.compile("\\b(?:\\d{3}[\\s-]?\\d{3}[\\s-]?\\d{4}|\\d{10})\\b");
-        // Unformatted 10-12 digit numbers that start with 0 or 1 (common phone patterns)
         Pattern unformattedPattern = Pattern.compile("\\b(?:0[1-9]\\d{8}|1[2-9]\\d{9})\\b");
 
         List<SensitiveDataItem> out = new ArrayList<>();
 
-        // Check international format
         Matcher m = intlPattern.matcher(text);
         while (m.find()) {
             int s = m.start();
@@ -652,7 +653,6 @@ public class PiiDetectServiceImpl implements PiiDetectService {
             }
         }
 
-        // Check local format
         m = localPattern.matcher(text);
         while (m.find()) {
             int s = m.start();
@@ -666,13 +666,11 @@ public class PiiDetectServiceImpl implements PiiDetectService {
             }
         }
 
-        // Check unformatted numbers that look like phones
         m = unformattedPattern.matcher(text);
         while (m.find()) {
             int s = m.start();
             int e = m.end();
             String value = text.substring(s, e);
-            // Avoid capturing known IDs like case IDs, contract refs, etc.
             if (!value.matches("\\d{4}-\\d{2,6}") && !value.matches("\\d{8,18}")) {
                 if (isValidOffsets(text, value, s, e)) {
                     out.add(new SensitiveDataItem("PHONE", value, sourceLabel, s, e));
@@ -684,10 +682,8 @@ public class PiiDetectServiceImpl implements PiiDetectService {
     }
 
     private List<SensitiveDataItem> detectAddresses(String sourceLabel, String text) {
-        // Simple pattern for street addresses: number + street name + street suffix
         Pattern streetPattern = Pattern.compile("\\b\\d+\\s+\\p{Lu}\\p{Ll}+\\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl)\\b",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
-        // Pattern for city, state, zip (optional)
         Pattern cityStateZip = Pattern.compile("\\b\\p{Lu}\\p{Ll}+\\s*,\\s*[A-Z]{2}\\s+\\d{5}(?:-\\d{4})?\\b",
                 Pattern.UNICODE_CHARACTER_CLASS);
 
@@ -773,14 +769,11 @@ public class PiiDetectServiceImpl implements PiiDetectService {
     }
 
     private List<SensitiveDataItem> detectCardNumbers(String sourceLabel, String text) {
-        // Formatted card numbers with spaces/dashes
         Pattern formatted = Pattern.compile("\\b(?:\\d{4}[ -]){3,4}\\d{1,4}\\b");
-        // Unformatted 16-digit numbers (common length) - we'll apply Luhn validation
         Pattern unformatted16 = Pattern.compile("\\b\\d{16}\\b");
 
         List<SensitiveDataItem> out = new ArrayList<>();
 
-        // Formatted
         Matcher m = formatted.matcher(text);
         while (m.find()) {
             int s = m.start();
@@ -792,7 +785,6 @@ public class PiiDetectServiceImpl implements PiiDetectService {
             }
         }
 
-        // Unformatted 16-digit (with Luhn check)
         m = unformatted16.matcher(text);
         while (m.find()) {
             int s = m.start();
@@ -825,11 +817,9 @@ public class PiiDetectServiceImpl implements PiiDetectService {
     private List<SensitiveDataItem> detectBankAccounts(String sourceLabel, String text) {
         List<SensitiveDataItem> out = new ArrayList<>();
 
-        // IBAN-like
         Pattern iban = Pattern.compile("\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b", Pattern.CASE_INSENSITIVE);
         findAllMatches(out, TYPE_BANK_ACCOUNT, sourceLabel, text, iban);
 
-        // Labeled digits
         Pattern labeledDigits = Pattern.compile("(?i)\\b(?:acct|account|a/c|acc\\.?|account\\s*no\\.?)\\s*[:#-]?\\s*(\\d{10,18})\\b");
         Matcher m = labeledDigits.matcher(text);
         while (m.find()) {
@@ -842,17 +832,14 @@ public class PiiDetectServiceImpl implements PiiDetectService {
             }
         }
 
-        // Unlabeled digits that are not phones, not card numbers, not IDs
         Pattern unlabeledDigits = Pattern.compile("\\b\\d{8,18}\\b");
         m = unlabeledDigits.matcher(text);
         while (m.find()) {
             int s = m.start();
             int e = m.end();
             String value = text.substring(s, e);
-            // Skip if it's a phone-like number (detected separately)
             if (value.startsWith("0") && value.length() == 10) continue;
             if (value.matches("\\d{4}-\\d{2,6}")) continue;
-            // Skip if it looks like a card number (we already have a dedicated method)
             if (value.length() == 16 && isValidLuhn(value)) continue;
             if (isValidOffsets(text, value, s, e)) {
                 out.add(new SensitiveDataItem(TYPE_BANK_ACCOUNT, value, sourceLabel, s, e));
