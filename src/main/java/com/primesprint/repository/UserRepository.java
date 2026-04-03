@@ -12,5 +12,5 @@ public interface UserRepository {
 
     void updateUserStatus(UUID userId, String status);
 
-    void saveNewPassword(String password);
+    void saveNewPassword(String password,String email);
 }

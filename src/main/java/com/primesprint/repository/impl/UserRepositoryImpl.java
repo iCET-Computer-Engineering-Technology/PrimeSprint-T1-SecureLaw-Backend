@@ -77,8 +77,8 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public void saveNewPassword(String password) {
-        String sql="UPDATE user SET password = ? WHERE email = ?";
-        jdbcTemplate.update(sql,password);
+    public void saveNewPassword(String password,String email) {
+        String sql="UPDATE users SET password = ? WHERE email = ?";
+        jdbcTemplate.update(sql,password,email);
     }
 }

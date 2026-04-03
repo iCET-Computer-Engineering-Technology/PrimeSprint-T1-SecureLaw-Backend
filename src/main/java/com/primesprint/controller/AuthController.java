@@ -1,5 +1,6 @@
 package com.primesprint.controller;
 
+import com.primesprint.dto.AuthDto;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
 import com.primesprint.model.dto.request.RegisterRequest;
@@ -53,9 +54,11 @@ public class AuthController {
         return ResponseEntity.ok("Logged out successfully; please remove token on client side.");
     }
 
-    @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestBody UserDto userDto) {
-       authService.resetPassword(userDto.getEmail(), userDto.getResetPassword());
+
+    @PostMapping("/users/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody AuthDto authDto) {
+       authService.resetPassword( authDto.getEmail(),  authDto.getNewPassword());
         return ResponseEntity.ok("Password has been reset successfully");
     }
+
 }

@@ -28,7 +28,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
     private final UserMapper userMapper;
-    private final UserDto userDto;
+
 
 
     public LoginResponse login(LoginRequest request) {
@@ -114,22 +114,13 @@ public class AuthService {
         return userMapper.toDto(user);
     }
 
-    public UserDto emailValidation(String email) {
+
+    public void resetPassword(String email,String newPassword) {
         User user = userRepository.findByUsernameOrEmail(email);
         if (user == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Email not found"
-            );
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Email is not found");
         }
-        return userMapper.toDto(user);
-    }
-
-    public void resetPassword(String email,String newPassword){
-        emailValidation(email);
-        User user = userRepository.findByUsernameOrEmail(email);
-        String encodedPassword=passwordEncoder.encode(newPassword);
-        user.setPassword(encodedPassword);
-        userRepository.saveNewPassword(newPassword);//can come nullPointException
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        userRepository.saveNewPassword(encodedPassword, email);
     }
 }
