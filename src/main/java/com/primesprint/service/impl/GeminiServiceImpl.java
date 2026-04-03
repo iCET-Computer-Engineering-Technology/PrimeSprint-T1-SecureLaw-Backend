@@ -5,7 +5,6 @@ import com.google.genai.types.GenerateContentResponse;
 import com.primesprint.model.dto.request.ExternalAiRequest;
 import com.primesprint.model.dto.response.ExternalAiResponse;
 import com.primesprint.service.GeminiService;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,44 +27,62 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public ExternalAiResponse process(ExternalAiRequest externalAiRequest) {
-        
+
         String prompt = externalAiRequest.getMaskedPrompt();
         String doc = externalAiRequest.getMaskedDocument();
 
-        String legend = externalAiRequest.getTokenMappings().keySet().stream()
-                .map(this::toLegendLine)
-                .collect(Collectors.joining("\n"));
+        boolean isChatMode = doc == null || doc.trim().isEmpty() ||
+                externalAiRequest.getTokenMappings() == null || externalAiRequest.getTokenMappings().isEmpty();
 
-        String text = """
-                You are a legal document assistant. You will receive:
-                1) A masked document (context) containing ONLY tokens in the form <<<SL_TOKEN_xxx_TYPE_SEQn>>>.
-                2) A masked user prompt that instructs what to do with the masked document.
-                
-                RULES (CRITICAL — enforce verbatim):
-                1. NEVER modify, remove, rename, or split any <<<SL_TOKEN_...>>> placeholder.
-                2. Copy each token EXACTLY as-is in your output whenever the value belongs there.
-                3. Treat each token as the real value of its type and write naturally around it.
-                4. If you are unsure whether a token should appear, prefer to include it where context indicates.
-                5. Do not invent new tokens or make up values for tokens.
-                6. If asked to redact or obscure data, keep tokens unchanged and follow the instruction with tokens intact.
-                
-                TOKEN LEGEND:
-                ${legend}
-                
-                INPUT:
-                DOCUMENT:
-                ${maskedDocument}
-                
-                USER PROMPT:
-                ${maskedPrompt}
-                
-                Produce a single text output — do not return JSON or metadata. The response must include any tokens required and remain natural and professional.
-                
-                """;
+        String text;
+        if (isChatMode) {
+            String chatPromptTemplate = """
+                    You are SecureFlow, a professional AI assistant integrated into a secure document processing system.
+                    
+                    Your role:
+                    - Assist users with questions and tasks
+                    - Respond naturally and helpfully
+                    - Maintain a professional tone
+                    
+                    Rules:
+                    - Do NOT mention Google, Gemini, or any underlying model
+                    - Do NOT describe yourself as a language model
+                    - Always present yourself as SecureFlow
+                    
+                    USER MESSAGE:
+                    %s
+                    """;
+            text = chatPromptTemplate.formatted(prompt != null ? prompt : "");
+        } else {
+            String legend = externalAiRequest.getTokenMappings().keySet().stream()
+                    .map(this::toLegendLine)
+                    .collect(Collectors.joining("\n"));
 
-        text = text.replace("${maskedDocument}",doc);
-        text = text.replace("${maskedPrompt}",prompt);
-        text = text.replace("${legend}",legend);
+            String securePromptTemplate = """
+                    You are a legal document assistant.
+                    
+                    Task:
+                    Execute the user's instruction using the provided document.
+                    
+                    Constraints:
+                    - Preserve all tokens exactly as they appear (<<<SL_TOKEN_...>>>).
+                    - Never modify, rename, split, or remove tokens.
+                    - Do not invent new tokens.
+                    - Write naturally around tokens.
+                    
+                    Token Legend:
+                    %s
+                    
+                    Document:
+                    %s
+                    
+                    User Instruction:
+                    %s
+                    
+                    Return only the final processed text.
+                    """;
+            text = securePromptTemplate.formatted(legend, doc, prompt != null ? prompt : "");
+        }
 
         String apiKey = geminiApiKey == null ? "" : geminiApiKey.trim();
         if (apiKey.isEmpty()) {
@@ -80,7 +97,8 @@ public class GeminiServiceImpl implements GeminiService {
                             text,
                             null);
 
-            return new ExternalAiResponse(externalAiRequest.getRequestId(), externalAiRequest.getProvider(), model, response.text(), null);
+            String responseText = response.text();
+            return new ExternalAiResponse(externalAiRequest.getRequestId(), externalAiRequest.getProvider(), model, responseText != null ? responseText.trim() : "", null);
         }
     }
 
