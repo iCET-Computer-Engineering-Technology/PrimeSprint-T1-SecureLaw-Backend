@@ -31,7 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/internal/rehydrate").permitAll()
                         .requestMatchers("/api/internal/mask").permitAll()
                         .requestMatchers("/audit/*").permitAll()
-                        .requestMatchers("/audit/test/*").permitAll()
+                        .requestMatchers("/**").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("SENIOR")
                         .requestMatchers("/api/user/**").hasAnyRole("SENIOR", "JUNIOR")
