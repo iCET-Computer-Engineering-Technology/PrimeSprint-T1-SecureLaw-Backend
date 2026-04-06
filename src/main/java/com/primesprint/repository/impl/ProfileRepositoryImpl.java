@@ -36,7 +36,7 @@ public class ProfileRepositoryImpl implements ProfileRepository {
     }
 
     @Override
-    public Optional<Profile> getProfile(UUID userID) {
+    public Optional<Profile> getProfile(UUID userId) {
 
         String sql = """
                 SELECT * FROM profiles
@@ -46,7 +46,7 @@ public class ProfileRepositoryImpl implements ProfileRepository {
         return Optional.ofNullable(jdbcTemplate.queryForObject(
                 sql,
                 new ProfileRowMapper(),
-                userID
+                userId
         ));
     }
 

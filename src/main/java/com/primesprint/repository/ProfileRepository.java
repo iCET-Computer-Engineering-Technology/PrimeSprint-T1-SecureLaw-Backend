@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ProfileRepository {
-    UUID createProfile(UUID userID, String displayName);
-    Optional<Profile> getProfile(UUID userID);
+    UUID createProfile(UUID userId, String displayName);
+    Optional<Profile> getProfile(UUID userId);
     Optional<UUID> findProfileIdByUserId(UUID userId);
 }

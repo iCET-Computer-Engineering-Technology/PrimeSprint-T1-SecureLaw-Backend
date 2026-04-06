@@ -15,7 +15,7 @@ public class ChatTurnRepositoryImpl implements ChatTurnRepository {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public UUID save(ChatTurn chat) {
+    public UUID save(ChatTurn turn) {
 
         UUID turnId = UUID.randomUUID();
 
@@ -36,11 +36,11 @@ public class ChatTurnRepositoryImpl implements ChatTurnRepository {
         jdbcTemplate.update(
                 sql,
                 turnId,
-                chat.getChatId(),
-                chat.getUserPrompt(),
-                chat.getAiResponse(),
-                chat.getModelName(),
-                chat.getLatencyMs()
+                turn.getChatId(),
+                turn.getUserPrompt(),
+                turn.getAiResponse(),
+                turn.getModelName(),
+                turn.getLatencyMs()
         );
 
         return turnId;
