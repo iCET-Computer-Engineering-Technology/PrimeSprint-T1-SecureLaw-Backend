@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -35,17 +36,17 @@ public class ProfileRepositoryImpl implements ProfileRepository {
     }
 
     @Override
-    public Profile getProfile(UUID userID) {
+    public Optional<Profile> getProfile(UUID userID) {
 
         String sql = """
                 SELECT * FROM profiles
                 WHERE user_id = ?
                 """;
 
-        return jdbcTemplate.queryForObject(
+        return Optional.ofNullable(jdbcTemplate.queryForObject(
                 sql,
                 new ProfileRowMapper(),
                 userID
-        );
+        ));
     }
 }
