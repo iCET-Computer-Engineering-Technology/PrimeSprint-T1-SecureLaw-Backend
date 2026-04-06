@@ -49,4 +49,20 @@ public class ProfileRepositoryImpl implements ProfileRepository {
                 userID
         ));
     }
+
+    @Override
+    public Optional<UUID> findProfileIdByUserId(UUID userId) {
+        String sql = """
+            SELECT id
+            FROM profiles
+            WHERE user_id = ?
+            """;
+
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) ->
+                        rs.getObject("id", UUID.class),
+                userId
+        ).stream().findFirst();
+    }
 }
