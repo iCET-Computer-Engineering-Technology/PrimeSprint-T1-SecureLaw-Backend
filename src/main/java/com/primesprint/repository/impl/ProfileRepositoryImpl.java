@@ -15,21 +15,22 @@ public class ProfileRepositoryImpl implements ProfileRepository {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public UUID createProfile(UUID userID, String displayName) {
+    public UUID createProfile(UUID userId, String displayName) {
 
         UUID profileId = UUID.randomUUID();
 
         String sql = """
-               INSERT INTO profiles (id, userId, displayName,createdAt)
+               INSERT INTO profiles (id, user_id, display_name,created_at)
                VALUES (?,?,?,now())
            """;
 
         jdbcTemplate.update(
                 sql,
                 profileId,
-                userID,
+                userId,
                 displayName
         );
+
         return profileId;
     }
 
@@ -38,7 +39,7 @@ public class ProfileRepositoryImpl implements ProfileRepository {
 
         String sql = """
                 SELECT * FROM profiles
-                WHERE userId = ?
+                WHERE user_id = ?
                 """;
 
         return jdbcTemplate.queryForObject(
