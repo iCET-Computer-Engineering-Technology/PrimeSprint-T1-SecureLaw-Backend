@@ -1,7 +1,9 @@
 package com.primesprint.service.impl;
 
+import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.model.dto.request.MaskRequest;
 import com.primesprint.model.dto.response.MaskResponse;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.service.MaskService;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +12,7 @@ import java.util.*;
 @Service
 public class MaskServiceImpl implements MaskService {
     @Override
+    @AIInteractionAuditable(action = ActionType.MASK_APPLIED)
     public MaskResponse mask(MaskRequest maskRequest) {
         StringBuilder doc = new StringBuilder(maskRequest.getDocument());
         StringBuilder prompt = new StringBuilder(maskRequest.getPrompt());

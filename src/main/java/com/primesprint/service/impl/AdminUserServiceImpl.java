@@ -1,5 +1,6 @@
 package com.primesprint.service.impl;
 
+import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.Page;
 import com.primesprint.model.dto.UserDto;
@@ -8,6 +9,7 @@ import com.primesprint.model.dto.request.UserCreateRequest;
 import com.primesprint.model.dto.request.UserUpdateRequest;
 import com.primesprint.model.entity.Role;
 import com.primesprint.model.entity.User;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.repository.AdminUserRepository;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.service.AdminUserService;
@@ -30,6 +32,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final UserMapper userMapper;
 
     @Override
+    @Auditable(action = ActionType.USER_CREATED)
     public UserDto createUser(UserCreateRequest request) {
         if (adminUserRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
@@ -59,6 +62,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Auditable(action = ActionType.USER_UPDATED)
     public UserDto updateUser(UUID id, UserUpdateRequest request) {
         User user = adminUserRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
@@ -96,6 +100,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Auditable(action = ActionType.USER_DEACTIVATED)
     public void deleteUser(UUID id) {
         User user = adminUserRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));

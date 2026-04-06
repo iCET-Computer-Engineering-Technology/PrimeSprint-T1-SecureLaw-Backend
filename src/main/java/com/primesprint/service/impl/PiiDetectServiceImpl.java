@@ -3,8 +3,10 @@ package com.primesprint.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.primesprint.client.GroqLlmClient;
+import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.model.dto.SensitiveDataItem;
 import com.primesprint.model.dto.request.PiiDetectRequest;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.service.PiiDetectService;
 import com.primesprint.util.AllowedTypes;
 import org.slf4j.Logger;
@@ -123,6 +125,7 @@ public class PiiDetectServiceImpl implements PiiDetectService {
     }
 
     @Override
+    @AIInteractionAuditable(action = ActionType.PII_DETECTED)
     public List<SensitiveDataItem> detect(PiiDetectRequest request) {
         long t0 = System.nanoTime();
         String requestId = safeRequestId(request);
