@@ -5,5 +5,5 @@ import com.primesprint.model.entity.ChatTurn;
 import java.util.UUID;
 
 public interface ChatTurnRepository {
-    UUID save(ChatTurn chat);
+    UUID save(ChatTurn turn);
 }
