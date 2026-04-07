@@ -22,4 +22,5 @@ public class UserDto {
     private UUID seniorId;
     private Timestamp createdAt;
     private Timestamp updatedAt;
+    private String password;
 }
