@@ -203,4 +203,20 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
             return user;
         }, searchPattern, searchPattern, size, offset);
     }
+
+    @Override
+    public Optional<UUID> findIdByUsername(String username) {
+        String sql = """
+            SELECT id
+            FROM users
+            WHERE username = ?
+            """;
+
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) ->
+                        rs.getObject("id", UUID.class),
+                username
+        ).stream().findFirst();
+    }
 }

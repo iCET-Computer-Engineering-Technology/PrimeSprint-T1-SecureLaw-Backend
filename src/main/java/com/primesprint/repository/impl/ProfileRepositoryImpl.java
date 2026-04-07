@@ -1,0 +1,68 @@
+package com.primesprint.repository.impl;
+
+import com.primesprint.mapper.ProfileRowMapper;
+import com.primesprint.model.entity.Profile;
+import com.primesprint.repository.ProfileRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+@RequiredArgsConstructor
+public class ProfileRepositoryImpl implements ProfileRepository {
+    private final JdbcTemplate jdbcTemplate;
+
+    @Override
+    public UUID createProfile(UUID userId, String displayName) {
+
+        UUID profileId = UUID.randomUUID();
+
+        String sql = """
+               INSERT INTO profiles (id, user_id, display_name,created_at)
+               VALUES (?,?,?,now())
+           """;
+
+        jdbcTemplate.update(
+                sql,
+                profileId,
+                userId,
+                displayName
+        );
+
+        return profileId;
+    }
+
+    @Override
+    public Optional<Profile> getProfile(UUID userId) {
+
+        String sql = """
+                SELECT * FROM profiles
+                WHERE user_id = ?
+                """;
+
+        return Optional.ofNullable(jdbcTemplate.queryForObject(
+                sql,
+                new ProfileRowMapper(),
+                userId
+        ));
+    }
+
+    @Override
+    public Optional<UUID> findProfileIdByUserId(UUID userId) {
+        String sql = """
+            SELECT id
+            FROM profiles
+            WHERE user_id = ?
+            """;
+
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) ->
+                        rs.getObject("id", UUID.class),
+                userId
+        ).stream().findFirst();
+    }
+}
