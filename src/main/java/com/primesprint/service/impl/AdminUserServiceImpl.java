@@ -13,6 +13,7 @@ import com.primesprint.repository.AdminUserRepository;
 import com.primesprint.repository.ProfileRepository;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.service.AdminUserService;
+import com.primesprint.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -40,11 +44,15 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EmailService emailService;
 
     @Value("${app.access-link-base:https://secureflow.com/access}")
     private String accessLinkBase = "https://secureflow.com/access";
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final ZoneId COLOMBO_ZONE = ZoneId.of("Asia/Colombo");
+    private static final DateTimeFormatter CREATED_AT_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
     @Override
     @Transactional
@@ -73,7 +81,14 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .updatedAt(Timestamp.from(Instant.now()))
                 .build();
         User savedUser = adminUserRepository.save(user);
+        String createdAtColombo = formatCreatedAtInColombo(savedUser.getCreatedAt());
 
+        emailService.sendInvitationEmail(
+                savedUser.getEmail(),
+                savedUser.getUsername(),
+                createdAtColombo,
+                request.getPassword()
+        );
         profileRepository.createProfile(
                 savedUser.getId(),
                 savedUser.getUsername()
@@ -88,10 +103,15 @@ public class AdminUserServiceImpl implements AdminUserService {
                 savedUser.getEmail(),
                 savedUser.getUsername(),
                 accessLink,
-                savedUser.getCreatedAt().toInstant().toString()
+                createdAtColombo
         ));
 
         return userMapper.toDto(savedUser);
+    }
+
+    private String formatCreatedAtInColombo(Timestamp createdAt) {
+        ZonedDateTime colomboTime = createdAt.toInstant().atZone(COLOMBO_ZONE);
+        return colomboTime.format(CREATED_AT_FORMATTER);
     }
 
     private String generateSetupToken() {

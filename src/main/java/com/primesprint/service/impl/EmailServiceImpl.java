@@ -23,13 +23,16 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.mail.from:${spring.mail.username:}}")
     private String fromEmail;
 
+    @Value("${app.frontend.login-url:http://localhost:4200/login}")
+    private String frontendLoginUrl;
+
     @Async
     @Retryable(
             retryFor = { Exception.class },
             backoff = @Backoff(delay = 2000)
     )
     @Override
-    public void sendInvitationEmail(String toEmail, String accessLink, String username, String createdAt) {
+    public void sendInvitationEmail(String toEmail, String username, String createdAt, String password) {
         log.info("Attempting to send invitation email to: {}", toEmail);
 
         if (!StringUtils.hasText(fromEmail)) {
@@ -210,6 +213,7 @@ public class EmailServiceImpl implements EmailService {
                     
                                       <div class="meta">
                                         <p><strong>Username:</strong> {{username}}</p>
+                                        <p><strong>password:</strong> {{password}}</p>
                                         <p><strong>Created At:</strong> {{created_at}}</p>
                                       </div>
                     
@@ -242,9 +246,10 @@ public class EmailServiceImpl implements EmailService {
                 """;
 
             String htmlContent = htmlTemplate
-                    .replace("{{verification_url}}", accessLink)
+                    .replace("{{verification_url}}", frontendLoginUrl)
                     .replace("{{recipient_name}}", username)
                     .replace("{{username}}", username)
+                    .replace("{{password}}", password)
                     .replace("{{created_at}}", createdAt);
             helper.setText(htmlContent, true);
             mailSender.send(message);
