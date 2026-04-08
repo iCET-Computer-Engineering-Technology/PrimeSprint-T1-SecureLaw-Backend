@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/admin/**").permitAll()
                         .requestMatchers("/api/user/**").hasAnyRole("SENIOR", "JUNIOR")
+                        .requestMatchers("/api/v1/users/create").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // Swagger open
                         .anyRequest().authenticated()
                 )
