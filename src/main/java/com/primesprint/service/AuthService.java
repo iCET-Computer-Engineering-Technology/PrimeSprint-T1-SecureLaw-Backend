@@ -1,11 +1,13 @@
 package com.primesprint.service;
 
+import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
 import com.primesprint.model.dto.request.RegisterRequest;
 import com.primesprint.model.dto.response.LoginResponse;
 import com.primesprint.model.entity.User;
+import com.primesprint.model.enums.ActionType;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.repository.UserRepository;
 import com.primesprint.security.JwtUtil;
@@ -29,6 +31,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final UserMapper userMapper;
 
+    @Auditable(action = ActionType.LOGIN)
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository
@@ -62,6 +65,7 @@ public class AuthService {
         );
     }
 
+    @Auditable(action = ActionType.REGISTER)
     public void register(RegisterRequest request) {
         String hashedPassword = passwordEncoder.encode(request.getPassword());
         UUID roleId = roleRepository.findRoleIdByName(request.getRole().name());
@@ -98,6 +102,7 @@ public class AuthService {
         return userMapper.toDto(user);
     }
 
+    @Auditable(action =ActionType.USER_PROFILE_VIEWED )
     public UserDto getUserByUsername(String username) {
 
         User user = userRepository.findByUsernameOrEmail(username);

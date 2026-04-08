@@ -1,6 +1,8 @@
 package com.primesprint.service;
 
+import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.dto.UploadResponse;
+import com.primesprint.model.enums.ActionType;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,6 +16,7 @@ import java.util.UUID;
 public class FileService {
     private static final long MAX_SIZE = 20L * 1024 * 1024;
 
+    @Auditable(action = ActionType.DOCUMENT_UPLOADED)
     public UploadResponse processFile(MultipartFile file) {
 
         if (file.isEmpty()) {
