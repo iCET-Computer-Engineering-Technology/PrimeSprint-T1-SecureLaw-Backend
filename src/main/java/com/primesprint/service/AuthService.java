@@ -1,6 +1,6 @@
 package com.primesprint.service;
 
-import com.primesprint.event.UserCreatedEvent;
+import com.primesprint.event.UserRegisteredEvent;
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
@@ -20,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 
@@ -37,6 +39,8 @@ public class AuthService {
 
     @Value("${app.access-link-base:https://secureflow.com/access}")
     private String accessLinkBase = "https://secureflow.com/access";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public LoginResponse login(LoginRequest request) {
 
@@ -82,15 +86,23 @@ public class AuthService {
                 roleId
         );
 
-        String accessLink = accessLinkBase + "?email=" + java.net.URLEncoder.encode(request.getEmail(), StandardCharsets.UTF_8);
-        eventPublisher.publishEvent(new UserCreatedEvent(
+        String setupToken = generateSetupToken();
+        String accessLink = accessLinkBase
+                + "?email=" + java.net.URLEncoder.encode(request.getEmail(), StandardCharsets.UTF_8)
+                + "&setupToken=" + java.net.URLEncoder.encode(setupToken, StandardCharsets.UTF_8);
+        eventPublisher.publishEvent(new UserRegisteredEvent(
                 null,
                 request.getEmail(),
                 request.getUsername(),
                 accessLink,
-                request.getPassword(),
                 Instant.now().toString()
         ));
+    }
+
+    private String generateSetupToken() {
+        byte[] tokenBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
     public String loginAndGetToken(LoginRequest request) {

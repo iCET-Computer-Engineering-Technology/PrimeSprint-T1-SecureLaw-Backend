@@ -1,6 +1,6 @@
 package com.primesprint.listener;
 
-import com.primesprint.event.UserCreatedEvent;
+import com.primesprint.event.UserRegisteredEvent;
 import com.primesprint.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,13 +15,12 @@ public class UserEventListener {
     private final EmailService emailService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleUserCreatedEvent(UserCreatedEvent event) {
-        log.info("Transaction committed. Triggering invitation email for: {}", event.email());
+    public void handleUserRegisteredEvent(UserRegisteredEvent event) {
+        log.info("Transaction committed. Triggering registration email for: {}", event.email());
         emailService.sendInvitationEmail(
                 event.email(),
                 event.accessLink(),
                 event.username(),
-                event.temporaryPassword(),
                 event.createdAt()
         );
     }

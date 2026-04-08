@@ -14,9 +14,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,7 +29,7 @@ public class EmailServiceImpl implements EmailService {
             backoff = @Backoff(delay = 2000)
     )
     @Override
-    public void sendInvitationEmail(String toEmail, String accessLink, String username, String temporaryPassword, String createdAt) {
+    public void sendInvitationEmail(String toEmail, String accessLink, String username, String createdAt) {
         log.info("Attempting to send invitation email to: {}", toEmail);
 
         if (!StringUtils.hasText(fromEmail)) {
@@ -213,7 +210,6 @@ public class EmailServiceImpl implements EmailService {
                     
                                       <div class="meta">
                                         <p><strong>Username:</strong> {{username}}</p>
-                                        <p><strong>Password:</strong> {{temporary_password}}</p>
                                         <p><strong>Created At:</strong> {{created_at}}</p>
                                       </div>
                     
@@ -246,11 +242,10 @@ public class EmailServiceImpl implements EmailService {
                 """;
 
             String htmlContent = htmlTemplate
-                    .replace("{{verification_url}}", "https://localhost:8080/login")
+                    .replace("{{verification_url}}", accessLink)
                     .replace("{{recipient_name}}", username)
                     .replace("{{username}}", username)
-                    .replace("{{temporary_password}}", temporaryPassword)
-                    .replace("{{created_at}}", ZonedDateTime.now(ZoneId.of("Asia/Colombo")).toString());
+                    .replace("{{created_at}}", createdAt);
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("Invitation email sent successfully to: {}", toEmail);
@@ -265,11 +260,12 @@ public class EmailServiceImpl implements EmailService {
                                     String toEmail,
                                     String accessLink,
                                     String username,
-                                    String temporaryPassword,
                                     String createdAt) {
-        log.error("Failed to send email to {} after retries. Access link: {}. Error: {}",
+        log.error("Failed to send email to {} after retries. Access link: {}. username: {}. createdAt: {}. Error: {}",
                 toEmail,
                 accessLink,
+                username,
+                createdAt,
                 exception.getMessage(),
                 exception);
     }
