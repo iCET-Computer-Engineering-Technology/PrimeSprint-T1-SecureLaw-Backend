@@ -9,6 +9,7 @@ import com.primesprint.model.dto.request.UserUpdateRequest;
 import com.primesprint.model.entity.Role;
 import com.primesprint.model.entity.User;
 import com.primesprint.repository.AdminUserRepository;
+import com.primesprint.repository.ProfileRepository;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.service.AdminUserService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final AdminUserRepository adminUserRepository;
     private final RoleRepository roleRepository;
+    private final ProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
 
@@ -55,6 +57,12 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .updatedAt(Timestamp.from(Instant.now()))
                 .build();
         User savedUser = adminUserRepository.save(user);
+
+        profileRepository.createProfile(
+                savedUser.getId(),
+                savedUser.getUsername()
+        );
+
         return userMapper.toDto(savedUser);
     }
 

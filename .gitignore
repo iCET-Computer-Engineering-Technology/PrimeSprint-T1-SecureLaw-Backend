@@ -13,6 +13,7 @@ target/
 !.idea/libraries/
 .idea/dataSources*
 .idea/dataSources/
+.idea/dataSources.xml
 *.iws
 *.iml
 *.ipr
