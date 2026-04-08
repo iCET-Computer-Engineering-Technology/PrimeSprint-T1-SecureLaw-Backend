@@ -1,5 +1,6 @@
 package com.primesprint.service;
 
+import com.primesprint.event.UserRegisteredEvent;
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.UserDto;
 import com.primesprint.model.dto.request.LoginRequest;
@@ -10,12 +11,18 @@ import com.primesprint.repository.RoleRepository;
 import com.primesprint.repository.UserRepository;
 import com.primesprint.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 
@@ -28,6 +35,12 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
     private final UserMapper userMapper;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Value("${app.access-link-base:https://secureflow.com/access}")
+    private String accessLinkBase = "https://secureflow.com/access";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public LoginResponse login(LoginRequest request) {
 
@@ -62,6 +75,7 @@ public class AuthService {
         );
     }
 
+    @Transactional
     public void register(RegisterRequest request) {
         String hashedPassword = passwordEncoder.encode(request.getPassword());
         UUID roleId = roleRepository.findRoleIdByName(request.getRole().name());
@@ -71,6 +85,24 @@ public class AuthService {
                 hashedPassword,
                 roleId
         );
+
+        String setupToken = generateSetupToken();
+        String accessLink = accessLinkBase
+                + "?email=" + java.net.URLEncoder.encode(request.getEmail(), StandardCharsets.UTF_8)
+                + "&setupToken=" + java.net.URLEncoder.encode(setupToken, StandardCharsets.UTF_8);
+        eventPublisher.publishEvent(new UserRegisteredEvent(
+                null,
+                request.getEmail(),
+                request.getUsername(),
+                accessLink,
+                Instant.now().toString()
+        ));
+    }
+
+    private String generateSetupToken() {
+        byte[] tokenBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
     public String loginAndGetToken(LoginRequest request) {
