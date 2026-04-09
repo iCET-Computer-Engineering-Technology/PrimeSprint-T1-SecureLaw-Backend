@@ -45,7 +45,7 @@ public class MaskServiceImpl implements MaskService {
             countMap.put(s.getType(), currentCount);
 
             String token = String.format("<<<SL_TOKEN_%s_%s_SEQ%d>>>",
-                    UUID.randomUUID(), s.getType(), currentCount);
+                    UUID.randomUUID().toString().substring(0, 8), s.getType(), currentCount);
 
             tokenMap.put(token, sb.substring(s.getStart(), s.getEnd()));
 

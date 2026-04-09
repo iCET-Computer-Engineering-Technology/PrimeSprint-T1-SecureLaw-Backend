@@ -28,4 +28,6 @@ public interface AdminUserRepository {
     long countAll();
 
     List<User> search(int offset, int size, String sort, String direction, String search);
+
+    Optional<UUID> findIdByUsername(String username);
 }

@@ -1,5 +1,6 @@
 package com.primesprint.service.impl;
 
+import com.primesprint.event.UserRegisteredEvent;
 import com.primesprint.mapper.UserMapper;
 import com.primesprint.model.dto.Page;
 import com.primesprint.model.dto.UserDto;
@@ -9,27 +10,52 @@ import com.primesprint.model.dto.request.UserUpdateRequest;
 import com.primesprint.model.entity.Role;
 import com.primesprint.model.entity.User;
 import com.primesprint.repository.AdminUserRepository;
+import com.primesprint.repository.ProfileRepository;
 import com.primesprint.repository.RoleRepository;
 import com.primesprint.service.AdminUserService;
+import com.primesprint.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AdminUserServiceImpl implements AdminUserService {
 
     private final AdminUserRepository adminUserRepository;
     private final RoleRepository roleRepository;
+    private final ProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final ApplicationEventPublisher eventPublisher;
+    private final EmailService emailService;
+
+    @Value("${app.access-link-base:https://secureflow.com/access}")
+    private String accessLinkBase = "https://secureflow.com/access";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final ZoneId COLOMBO_ZONE = ZoneId.of("Asia/Colombo");
+    private static final DateTimeFormatter CREATED_AT_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
     @Override
+    @Transactional
     public UserDto createUser(UserCreateRequest request) {
         if (adminUserRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
@@ -55,7 +81,43 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .updatedAt(Timestamp.from(Instant.now()))
                 .build();
         User savedUser = adminUserRepository.save(user);
+        String createdAtColombo = formatCreatedAtInColombo(savedUser.getCreatedAt());
+
+        emailService.sendInvitationEmail(
+                savedUser.getEmail(),
+                savedUser.getUsername(),
+                createdAtColombo,
+                request.getPassword()
+        );
+        profileRepository.createProfile(
+                savedUser.getId(),
+                savedUser.getUsername()
+        );
+
+        String setupToken = generateSetupToken();
+        String accessLink = accessLinkBase
+                + "?email=" + URLEncoder.encode(savedUser.getEmail(), StandardCharsets.UTF_8)
+                + "&setupToken=" + URLEncoder.encode(setupToken, StandardCharsets.UTF_8);
+        eventPublisher.publishEvent(new UserRegisteredEvent(
+                null,
+                savedUser.getEmail(),
+                savedUser.getUsername(),
+                accessLink,
+                createdAtColombo
+        ));
+
         return userMapper.toDto(savedUser);
+    }
+
+    private String formatCreatedAtInColombo(Timestamp createdAt) {
+        ZonedDateTime colomboTime = createdAt.toInstant().atZone(COLOMBO_ZONE);
+        return colomboTime.format(CREATED_AT_FORMATTER);
+    }
+
+    private String generateSetupToken() {
+        byte[] tokenBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
     @Override
