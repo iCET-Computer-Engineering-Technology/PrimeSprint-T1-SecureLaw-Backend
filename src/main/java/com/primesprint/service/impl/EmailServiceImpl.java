@@ -14,6 +14,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,9 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${app.frontend.login-url:http://localhost:4200/login}")
     private String frontendLoginUrl;
+
+    @Value("${app.frontend.reset-password-url:http://localhost:4200/reset-password}")
+    private String frontendResetPasswordUrl;
 
     @Async
     @Retryable(
@@ -257,6 +263,179 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception exception) {
             log.warn("Email send attempt failed for {}: {}", toEmail, exception.getMessage());
             throw new IllegalStateException("Failed to send invitation email", exception);
+        }
+    }
+
+    @Override
+    public void sendPasswordResetEmail(String toEmail, String token) {
+        log.info("Attempting to send password reset email to: {}", toEmail);
+
+        if (!StringUtils.hasText(fromEmail)) {
+            throw new IllegalStateException("Mail sender address is empty. Configure app.mail.from or spring.mail.username");
+        }
+
+        String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
+        String resetUrl = frontendResetPasswordUrl + "?token=" + encodedToken;
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("SecureLaw password reset request");
+
+            String htmlTemplate = """
+                    <!DOCTYPE html>
+                    <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+                    <head>
+                      <meta charset="UTF-8">
+                      <meta name="viewport" content="width=device-width,initial-scale=1.0">
+                      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                      <title>SecureLaw Password Reset</title>
+                      <style>
+                        body, table, td, p, a {
+                          margin: 0;
+                          padding: 0;
+                          font-family: Arial, Helvetica, sans-serif;
+                          line-height: 1.5;
+                        }
+
+                        table {
+                          border-collapse: collapse;
+                        }
+
+                        .email-bg {
+                          width: 100%;
+                          background-color: #f2f4f8;
+                          padding: 24px 12px;
+                        }
+
+                        .card {
+                          width: 100%;
+                          max-width: 680px;
+                          background-color: #ffffff;
+                          border: 1px solid #e1e5ee;
+                          border-radius: 12px;
+                          overflow: hidden;
+                        }
+
+                        .header {
+                          padding: 22px 28px 12px;
+                          text-align: center;
+                          border-bottom: 1px solid #edf0f5;
+                        }
+
+                        .brand {
+                          font-size: 28px;
+                          letter-spacing: 0.4px;
+                          font-weight: 700;
+                          color: #131722;
+                        }
+
+                        .content {
+                          padding: 28px;
+                          color: #1f2a3d;
+                          font-size: 15px;
+                        }
+
+                        .headline {
+                          color: #131722;
+                          font-size: 24px;
+                          font-weight: 700;
+                          margin-bottom: 12px;
+                        }
+
+                        .body-copy {
+                          color: #3a465d;
+                          font-size: 15px;
+                          margin-bottom: 14px;
+                        }
+
+                        .cta {
+                          display: inline-block;
+                          background-color: #11131a;
+                          color: #ffffff;
+                          text-decoration: none;
+                          font-weight: 700;
+                          font-size: 14px;
+                          padding: 11px 18px;
+                          border-radius: 7px;
+                          margin: 8px 0 18px;
+                        }
+
+                        .meta {
+                          background: #f8f9fc;
+                          border: 1px solid #e6e9f0;
+                          border-radius: 8px;
+                          padding: 14px;
+                          margin: 8px 0 18px;
+                          font-size: 14px;
+                          color: #34415a;
+                        }
+
+                        .footer {
+                          padding: 14px 28px 24px;
+                          color: #647089;
+                          font-size: 11px;
+                          line-height: 1.5;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <table role="presentation" width="100%" class="email-bg">
+                        <tr>
+                          <td align="center">
+                            <table role="presentation" class="card" width="680">
+                              <tr>
+                                <td class="header">
+                                  <p class="brand">SecureLaw</p>
+                                </td>
+                              </tr>
+
+                              <tr>
+                                <td class="content">
+                                  <p class="headline">Reset your SecureLaw password</p>
+                                  <p class="body-copy">We received a request to reset your password.</p>
+                                  <p class="body-copy">Use the button below to create a new password. This link should be used only once and will expire soon.</p>
+
+                                  <a href="{{reset_url}}" class="cta" target="_blank" rel="noopener noreferrer">Reset Password</a>
+
+                                  <div class="meta">
+                                    <p><strong>Requested for:</strong> {{recipient_email}}</p>
+                                    <p><strong>If the button does not work, use this URL:</strong></p>
+                                    <p>{{reset_url}}</p>
+                                  </div>
+
+                                  <p class="body-copy">If you did not request a password reset, you can safely ignore this email.</p>
+                                </td>
+                              </tr>
+
+                              <tr>
+                                <td class="footer">
+                                  This email and any attachments are confidential and intended only for the recipient. If you received this message in error, please notify the sender and delete it immediately.
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </body>
+                    </html>
+                    
+                """;
+
+            String htmlContent = htmlTemplate
+                    .replace("{{reset_url}}", resetUrl)
+                    .replace("{{recipient_email}}", toEmail);
+            helper.setText(htmlContent, true);
+
+
+            mailSender.send(message);
+            log.info("Password reset email sent successfully to: {}", toEmail);
+        } catch (Exception exception) {
+            log.warn("Email send attempt failed for {}: {}", toEmail, exception.getMessage());
+            throw new IllegalStateException("Failed to send password reset email", exception);
         }
     }
 
