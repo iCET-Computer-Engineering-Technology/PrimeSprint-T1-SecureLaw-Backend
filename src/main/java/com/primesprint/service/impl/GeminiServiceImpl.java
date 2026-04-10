@@ -28,15 +28,20 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public ExternalAiResponse process(ExternalAiRequest externalAiRequest) {
-        
+
         String prompt = externalAiRequest.getMaskedPrompt();
         String doc = externalAiRequest.getMaskedDocument();
 
-        String legend = externalAiRequest.getTokenMappings().keySet().stream()
-                .map(this::toLegendLine)
-                .collect(Collectors.joining("\n"));
+        String legend = "";
+        String text = "";
 
-        String text = """
+        if(!externalAiRequest.getTokenMappings().isEmpty() && externalAiRequest.getMaskedDocument() != null){
+
+            legend = externalAiRequest.getTokenMappings().keySet().stream()
+                    .map(this::toLegendLine)
+                    .collect(Collectors.joining("\n"));
+
+            text = """
                 You are a legal document assistant. You will receive:
                 1) A masked document (context) containing ONLY tokens in the form <<<SL_TOKEN_xxx_TYPE_SEQn>>>.
                 2) A masked user prompt that instructs what to do with the masked document.
@@ -63,9 +68,80 @@ public class GeminiServiceImpl implements GeminiService {
                 
                 """;
 
-        text = text.replace("${maskedDocument}",doc);
-        text = text.replace("${maskedPrompt}",prompt);
-        text = text.replace("${legend}",legend);
+            text = text.replace("${maskedDocument}",doc).replace("${maskedPrompt}",prompt).replace("${legend}",legend);
+
+        }//have sensetive and has doc
+        else if (!externalAiRequest.getTokenMappings().isEmpty() && externalAiRequest.getMaskedDocument() == null){//have sensetive and has no doc
+
+            legend = externalAiRequest.getTokenMappings().keySet().stream()
+                    .map(this::toLegendLine)
+                    .collect(Collectors.joining("\n"));
+
+            text = """
+                You are a legal document assistant. You will receive:
+                1) A masked user prompt that may contain tokens in the form <<<SL_TOKEN_xxx_TYPE_SEQn>>>.
+                
+                RULES (CRITICAL — enforce verbatim):
+                1. NEVER modify, remove, rename, or split any <<<SL_TOKEN_...>>> placeholder.
+                2. Copy each token EXACTLY as-is in your output whenever the value belongs there.
+                3. Treat each token as the real value of its type and write naturally around it.
+                4. If you are unsure whether a token should appear, prefer to include it where context indicates.
+                5. Do not invent new tokens or make up values for tokens.
+                6. If asked to redact or obscure data, keep tokens unchanged and follow the instruction with tokens intact.
+                
+                TOKEN LEGEND:
+                ${legend}
+                
+                INPUT:
+                
+                USER PROMPT:
+                ${maskedPrompt}
+                
+                Produce a single text output — do not return JSON or metadata. The response must include any tokens required and remain natural and professional.
+                
+                """;
+
+            text = text.replace("${maskedPrompt}",prompt).replace("${legend}",legend);
+
+        }//have sensetive and has no doc
+        else if(externalAiRequest.getTokenMappings().isEmpty() && externalAiRequest.getMaskedDocument() != null){//dont have sensetive and has doc
+            text = """
+                You are a legal document assistant. You will receive:
+                1) A masked document (context).
+                2) A masked user prompt that instructs what to do with the masked document.
+                
+                INPUT:
+                DOCUMENT:
+                ${maskedDocument}
+                
+                USER PROMPT:
+                ${maskedPrompt}
+                
+                Produce a single text output — do not return JSON or metadata. The response must remain natural and professional.
+                
+                """;
+
+            text = text.replace("${maskedDocument}",doc).replace("${maskedPrompt}",prompt);
+
+        }//dont have sensetive and has doc
+        else if(externalAiRequest.getTokenMappings().isEmpty() && externalAiRequest.getMaskedDocument() == null){//dont have sensetive and has no doc
+
+            text = """
+                You are a legal document assistant. You will receive:
+                1) A masked user prompt.
+                
+                INPUT:
+                
+                USER PROMPT:
+                ${maskedPrompt}
+                
+                Produce a single text output — do not return JSON or metadata. The response must remain natural and professional.
+                
+                """;
+
+            text = text.replace("${maskedPrompt}",prompt);
+        }//dont have sensetive and has  doc
+
 
         String apiKey = geminiApiKey == null ? "" : geminiApiKey.trim();
         if (apiKey.isEmpty()) {
