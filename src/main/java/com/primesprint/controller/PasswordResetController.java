@@ -4,10 +4,8 @@ import com.primesprint.model.dto.response.ApiResponse;
 import com.primesprint.service.EmailService;
 import com.primesprint.service.PasswordResetService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("/api")
