@@ -1,6 +1,7 @@
 package com.primesprint.service.impl;
 
 import com.primesprint.custom_annotation.AIInteractionAuditable;
+import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.model.dto.request.RehydrateRequest;
 import com.primesprint.model.dto.response.RehydrateResponse;
 import com.primesprint.model.enums.ActionType;
@@ -13,7 +14,7 @@ import java.util.Map;
 @Service
 public class RehydrateServiceImpl implements RehydrateService {
     @Override
-    @AIInteractionAuditable(action = ActionType.REHYDRATE_REQUESTED)
+    @Auditable(action = ActionType.REHYDRATE_REQUESTED)
     public RehydrateResponse rehydrate(RehydrateRequest rehydrateRequest) {
         ArrayList<RehydrateResponse.Warning> warnings = new ArrayList<>();
         String tokenizedResponse = rehydrateRequest.getTokenizedResponse();
