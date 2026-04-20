@@ -24,5 +24,4 @@ public class PasswordResetController {
         return passwordResetService.resetPassword(reqId, password);
     }
 
-
 }
