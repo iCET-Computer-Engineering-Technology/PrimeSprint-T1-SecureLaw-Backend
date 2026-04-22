@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.model.AuditLog;
 import com.primesprint.service.AuditLogService;
-import com.primesprint.service.fallback.AuditFallbackHandler;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -25,7 +24,6 @@ public class AIInteractionAuditAspect {
     private final AuditLogService auditService;
     private static final Logger logger = LoggerFactory.getLogger(AIInteractionAuditAspect.class);
     private final MeterRegistry meterRegistry;
-    private final AuditFallbackHandler fallbackHandler;
 
     @Around("@annotation(aIAuditable)")
     public Object logAIAudit(ProceedingJoinPoint joinPoint, AIInteractionAuditable aIAuditable) throws Throwable {
@@ -76,7 +74,6 @@ public class AIInteractionAuditAspect {
                 logger.error("Audit persistence failed for AI interaction", e);
 
                 meterRegistry.counter("audit.failure.count").increment();
-                fallbackHandler.handle(log, e);
             }
 
         }

@@ -24,8 +24,10 @@ public class AuditLogRepositoryImpl implements AuditLogRepository {
 
     @Override
     public void insertAuditLog(AuditLog log) throws SQLException, JsonProcessingException {
-        //System.out.println("DB attempt...");
-        //throw new SQLException("Simulated DB failure");
+        //--------------Code - Testing DB Failure --------------------
+        // System.out.println("DB attempt...");
+        // throw new SQLException("Simulated DB failure");
+        //--------------End of testing ------------------------
         String sql = """
             INSERT INTO audit_log
             (id,user_id, timestamp, target,action, template_id,mask_counts, model_used, response_time, details)
