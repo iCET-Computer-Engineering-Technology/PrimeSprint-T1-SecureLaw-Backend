@@ -21,7 +21,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "http://localhost:4200")
 @RequestMapping("/audit")
 public class AuditLogController {
 
@@ -42,7 +42,7 @@ public class AuditLogController {
 
     @GetMapping("/get-audit-by-date")
     public List<AuditLogDto> searchByDateRange(@RequestParam(name="from") LocalDate startDate,
-                                            @RequestParam(name="to") LocalDate endDate){
+                                               @RequestParam(name="to") LocalDate endDate){
         try {
             return service.searchByDateRange(startDate,endDate);
         } catch (SQLException e) {
@@ -56,8 +56,8 @@ public class AuditLogController {
 
     @GetMapping("/get-audit-by-date-and-userId")
     public List<AuditLogDto> searchByDateRangeForUser(@RequestParam(name="from") LocalDate startDate,
-                                                   @RequestParam(name="to") LocalDate endDate,
-                                                   @RequestParam(name="id") String userId){
+                                                      @RequestParam(name="to") LocalDate endDate,
+                                                      @RequestParam(name="id") String userId){
         try {
             return service.searchByDateRangeForUser(startDate,endDate,userId);
         } catch (SQLException e) {

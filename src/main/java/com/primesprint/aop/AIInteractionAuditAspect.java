@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.primesprint.custom_annotation.AIInteractionAuditable;
 import com.primesprint.model.AuditLog;
 import com.primesprint.service.AuditLogService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -21,9 +22,8 @@ import java.util.UUID;
 public class AIInteractionAuditAspect {
 
     private final AuditLogService auditService;
-
     private static final Logger logger = LoggerFactory.getLogger(AIInteractionAuditAspect.class);
-
+    private final MeterRegistry meterRegistry;
 
     @Around("@annotation(aIAuditable)")
     public Object logAIAudit(ProceedingJoinPoint joinPoint, AIInteractionAuditable aIAuditable) throws Throwable {
@@ -34,11 +34,11 @@ public class AIInteractionAuditAspect {
         Throwable methodException = null;
 
         try {
-            result = joinPoint.proceed(); // Execute actual method
+            result = joinPoint.proceed();
             return result;
 
         } catch (Throwable ex) {
-            methodException = ex; // capture but DO NOT swallow
+            methodException = ex;
             throw ex;
         } finally {
             long responseTime = System.currentTimeMillis() - startTime;
@@ -70,10 +70,10 @@ public class AIInteractionAuditAspect {
 
             try {
                 auditService.recordAuditLog(log);
-            }catch (JsonProcessingException e) {
-                logger.error("Invalid JSON format", e);
             } catch (Exception e) {
-                logger.warn("Failed to record AI interaction audit log", e);
+                logger.error("Audit persistence failed for AI interaction", e);
+
+                meterRegistry.counter("audit.failure.count").increment();
             }
 
         }

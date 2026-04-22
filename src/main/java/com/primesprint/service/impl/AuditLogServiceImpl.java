@@ -8,8 +8,12 @@ import com.primesprint.mapper.AuditLogMapper;
 import com.primesprint.model.AuditLog;
 import com.primesprint.repository.AuditLogRepository;
 import com.primesprint.service.AuditLogService;
+import com.primesprint.service.fallback.AuditFallbackHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -23,11 +27,22 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     private final AuditLogRepository repository;
     private final AuditLogMapper mapper;
+    private final AuditFallbackHandler fallbackHandler;
 
-    //Introduce for AOP
     @Override
+    @Retryable(
+            value = { SQLException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 500, multiplier = 2)
+    )
     public void recordAuditLog(AuditLog log) throws SQLException, JsonProcessingException {
         repository.insertAuditLog(log);
+    }
+
+    @Recover
+    public void recover(SQLException ex, AuditLog auditLog) {
+        log.error("All retry attempts failed. Writing to fallback.");
+        fallbackHandler.handle(auditLog, ex);
     }
 
     @Override
