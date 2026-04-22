@@ -10,6 +10,9 @@ import com.primesprint.repository.AuditLogRepository;
 import com.primesprint.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -26,8 +29,18 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     //Introduce for AOP
     @Override
+    @Retryable(
+            value = { SQLException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 200, multiplier = 2)
+    )
     public void recordAuditLog(AuditLog log) throws SQLException, JsonProcessingException {
         repository.insertAuditLog(log);
+    }
+
+    @Recover
+    public void recover(SQLException ex, AuditLog log) {
+        throw new RuntimeException("Audit DB failed after retries", ex);
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.primesprint.custom_annotation.Auditable;
 import com.primesprint.model.enums.ActionType;
 import com.primesprint.model.AuditLog;
 import com.primesprint.service.AuditLogService;
+import com.primesprint.service.fallback.AuditFallbackHandler;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -14,12 +16,15 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+
 @Aspect
 @Component
 @RequiredArgsConstructor
 public class SystemAuditAspect {
     private final AuditLogService auditService;
     private static final Logger LOGGER = LoggerFactory.getLogger(SystemAuditAspect.class);
+    private final MeterRegistry meterRegistry;
+    private final AuditFallbackHandler fallbackHandler;
 
     @AfterReturning(value = "@annotation(auditable)")
     public void logSystemAudit(JoinPoint joinPoint, Auditable auditable){
@@ -49,7 +54,10 @@ public class SystemAuditAspect {
         try {
             auditService.recordAuditLog(log);
         } catch (Exception e) {
-            LOGGER.error("Failed to record system audit log", e);
+            LOGGER.error("Audit persistence failed for system event", e);
+
+            meterRegistry.counter("audit.failure.count").increment();
+            fallbackHandler.handle(log, e);
         }
     }
 }
