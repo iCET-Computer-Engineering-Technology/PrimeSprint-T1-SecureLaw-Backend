@@ -20,3 +20,7 @@ ON audit_log(timestamp);
 
 CREATE INDEX idx_audit_action
 ON audit_log(action);
+
+
+
+

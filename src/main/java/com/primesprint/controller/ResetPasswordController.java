@@ -17,6 +17,6 @@ public class ResetPasswordController {
 
     @GetMapping("/reset")
     public ApiResponse<String> resetPassword(@PathVariable String email) {
-        return resetPasswordService.reset(email);
+        return resetPasswordService.reset( email);
     }
 }

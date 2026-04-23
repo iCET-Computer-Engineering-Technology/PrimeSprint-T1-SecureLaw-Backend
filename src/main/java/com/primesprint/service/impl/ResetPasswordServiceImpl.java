@@ -15,7 +15,8 @@ public class ResetPasswordServiceImpl implements ResetPasswordService {
 
     @Override
     public ApiResponse reset(String email) {
-        return null;
+         emailService.sendResetPasswordEmail(email);
+         return ApiResponse.success(1,"Reset password email sent successfully", null);
     }
 
 }
