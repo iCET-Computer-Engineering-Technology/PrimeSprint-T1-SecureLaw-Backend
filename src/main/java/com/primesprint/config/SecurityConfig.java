@@ -33,7 +33,7 @@ public class SecurityConfig {
                         .requestMatchers("/audit/*").permitAll()
                         .requestMatchers("/audit/test/*").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
-                        .requestMatchers("/api/admin/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SENIOR")
                         .requestMatchers("/api/user/**").hasAnyRole("SENIOR", "JUNIOR")
                         .requestMatchers("/api/v1/users/create").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // Swagger open
